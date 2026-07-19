@@ -1,7 +1,19 @@
-# ContextHub
+# Package Contents
 
-A document intelligence platform built to demonstrate modern AI engineering practices.
+This package contains the complete ContextHub Version 1 instruction set updated for:
 
-ContextHub ingests arbitrary document collections, indexes their contents using Retrieval-Augmented Generation (RAG), and provides grounded, cited answers through a REST API.
+- Streamlit demonstration client
+- FastAPI backend
+- FAISS vector similarity index
+- SQLite document and chunk metadata database
+- Hugging Face generation
+- offline ingestion and retrieval evaluation
 
-The platform emphasizes production software engineering, modular architecture, testing, evaluation, observability, and cloud-native deployment rather than serving as a simple "chat with PDF" application.
+Files:
+
+- `INSTRUCTIONS.md`
+- `docs/00_Project_Overview.md`
+- `docs/01_System_Architecture.md`
+- `docs/02_Data_Model.md`
+- `docs/03_Technical_Design.md`
+- `docs/04_Implementation_Plan.md`

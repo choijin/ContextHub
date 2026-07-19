@@ -1,95 +1,91 @@
 # ContextHub Implementation Plan
 
 **Project:** ContextHub  
-**Version:** 0.1  
-**Status:** Ready for execution
+**Version:** 1.0  
+**Status:** Ready for Execution
 
-## 1. Purpose
+---
 
-This plan divides ContextHub into eight sequential phases for implementation with Codex. Do not ask Codex to build the complete project at once.
+# 1. Purpose
 
-For each phase:
+This document defines the sequential implementation roadmap for ContextHub.
 
-1. have Codex read the documents under `docs/`;
-2. ask it to implement one phase only;
-3. require tests and quality checks;
-4. review the important files;
-5. correct problems;
-6. commit the working phase before continuing.
+The final deliverable is a public browser-based RAG application. The backend remains
+the engineering core, while a deliberately small Streamlit demonstration client makes the system
+usable by hiring managers and other portfolio visitors.
 
-## 2. Standard Codex Prompt
+Codex must implement one phase at a time. Each phase must leave the repository in a
+working, tested state.
+
+---
+
+# 2. Standard Codex Prompt
 
 ```text
-Read all Markdown files under docs/.
+Read every Markdown file under docs/.
 
-Implement Phase <NUMBER> from docs/05_Implementation_Plan.md.
-Follow docs/02_System_Architecture.md, docs/03_Data_Model.md,
-and docs/04_Technical_Design.md.
+Implement ONLY Phase <N> from docs/04_Implementation_Plan.md.
 
-Implement only the requested phase. Do not begin later phases.
+Follow:
+- docs/00_Project_Overview.md
+- docs/01_System_Architecture.md
+- docs/02_Data_Model.md
+- docs/03_Technical_Design.md
 
-Before changing code:
-1. summarize your implementation plan;
+Do not begin later phases.
+
+Before writing code:
+1. summarize the implementation plan;
 2. identify conflicts or ambiguities;
-3. state your assumptions.
+3. state assumptions.
 
 After implementation:
-1. run all required tests and quality checks;
-2. list every file created or changed;
-3. list the commands executed;
-4. report test, lint, and type-check results;
-5. explain any deviation from the design.
+1. list every file created or changed;
+2. list commands executed;
+3. report lint, formatting, type-check, test, Streamlit, and Docker results;
+4. explain any deviation from the design;
+5. identify remaining work for the current phase.
 ```
 
-# Phase 1 — Repository Foundation
+---
+
+# Phase 1 — Repository and Backend Foundation
 
 ## Goal
 
-Create a runnable and testable FastAPI project with configuration, logging, health endpoints, and quality tooling.
+Create a runnable, testable backend skeleton and establish quality standards.
 
-## Requirements
-
-Implement:
+## Implement
 
 - Python 3.12 project;
 - `pyproject.toml` and `uv`;
-- `src/contexthub` package;
-- FastAPI application;
+- documented backend package structure;
+- FastAPI application factory;
 - Pydantic settings;
 - structured logging;
-- FastAPI lifespan handler;
-- request ID middleware;
-- standard error response;
-- `/health` and `/ready`;
-- pytest structure;
-- Ruff and mypy configuration;
+- lifespan startup;
+- dependency-injection skeleton;
+- request ID handling;
+- standard error responses;
+- `GET /health`;
+- `GET /ready`;
+- pytest;
+- Ruff;
+- mypy;
 - `.env.example`;
 - `.gitignore`;
 - initial README.
 
-Suggested dependencies:
-
-```text
-fastapi
-uvicorn
-pydantic
-pydantic-settings
-python-multipart
-httpx
-pytest
-pytest-cov
-ruff
-mypy
-```
+Do not implement indexing, retrieval, LLM calls, or the frontend.
 
 ## Tests
 
 - settings load correctly;
 - invalid settings fail clearly;
 - health returns 200;
-- readiness returns 200 when initialized;
-- responses include a request ID;
-- unhandled errors follow the standard schema.
+- readiness reflects initialized and uninitialized states;
+- errors use the standard schema;
+- request IDs are returned.
 
 ## Quality Gates
 
@@ -100,511 +96,408 @@ uv run mypy src
 uv run pytest
 ```
 
-## Out of Scope
-
-PDF parsing, collections, uploads, embeddings, FAISS, LLM calls, Docker, and CI/CD.
-
 ## Completion Criteria
 
-The API starts locally, health checks work, tests pass, and the package structure is stable.
+The API starts locally, the package boundaries are established, and all quality gates
+pass.
 
 ---
 
-# Phase 2 — Collections, PDF Parsing, and Chunking
+# Phase 2 — Offline Index Builder
 
 ## Goal
 
-Create collections, upload a PDF, extract page-aware text, and create deterministic chunks.
+Build a deterministic, reproducible PDF indexing pipeline.
 
-## Requirements
+## Implement
 
-Implement:
-
-- collection, document, ingestion-job, and chunk domain models;
-- file-backed repositories;
-- local document storage;
-- SHA-256 checksum generation;
-- duplicate detection;
-- PDF validation;
+- document and chunk domain models;
 - PyMuPDF parser;
-- normalized document model;
+- one-based page metadata;
 - recursive chunker;
-- configurable chunk size and overlap;
-- deterministic chunk IDs;
-- page metadata preservation;
-- ingestion through chunk creation.
+- deterministic document and chunk IDs;
+- SHA-256 checksums;
+- sentence-transformer embedding adapter;
+- normalized embeddings;
+- FAISS `IndexFlatIP`;
+- SQLite document and chunk persistence;
+- transactional FAISS-position mapping;
+- manifest generation;
+- compatibility validation;
+- atomic index replacement;
+- `scripts/ingest.py`.
 
-Add:
+## Output
 
 ```text
-POST /v1/collections
-GET  /v1/collections
-GET  /v1/collections/{collection_id}
-POST /v1/documents
-GET  /v1/documents/{document_id}
-GET  /v1/ingestions/{job_id}
+data/index/
+├── faiss.index
+├── metadata.db
+└── manifest.json
 ```
-
-The upload endpoint accepts a collection ID, multipart PDF, and optional display name.
 
 ## Tests
 
-- create and retrieve collections;
-- reject unknown collections;
-- reject non-PDF and oversized files;
-- sanitize filenames;
-- calculate checksums;
-- detect duplicate uploads;
-- parse a multipage fixture PDF;
-- preserve one-based page numbers;
-- avoid chunks from empty pages;
-- enforce chunk size and overlap;
-- produce stable chunk IDs;
-- record parsing failures.
-
-## Out of Scope
-
-Embeddings, FAISS, semantic search, LLM calls, OCR, and asynchronous workers.
+- multipage PDF parsing;
+- empty-page behavior;
+- chunk-size and overlap validation;
+- deterministic IDs;
+- embedding dimensions;
+- FAISS save and load;
+- FAISS-to-SQLite position alignment;
+- SQLite schema and transaction behavior;
+- failed build preserves the previous valid index.
 
 ## Completion Criteria
 
-A PDF can be uploaded, parsed, chunked, inspected, and traced to source pages.
+```bash
+uv run python scripts/ingest.py
+```
+
+builds a reloadable index from `data/pdfs/`.
 
 ---
 
-# Phase 3 — Embeddings and FAISS Retrieval
+# Phase 3 — Runtime Retrieval
 
 ## Goal
 
-Index chunks and retrieve relevant passages without using an LLM.
+Load the saved index and retrieve relevant passages without an LLM.
 
-## Requirements
+## Implement
 
-Implement:
-
-- `EmbeddingProvider` interface;
-- Sentence Transformers implementation;
-- `VectorStore` interface;
-- FAISS implementation;
-- vector metadata persistence;
-- index load and save;
-- embedding dimension checks;
-- collection-scoped search;
+- `EmbeddingProvider` protocol;
+- `VectorStore` protocol;
+- `DocumentRepository` protocol;
+- `SQLiteDocumentRepository`;
+- `Retriever` protocol;
 - `RetrievalService`;
+- startup index loading;
+- manifest compatibility checks;
 - query embedding;
-- top-k retrieval;
+- top-k FAISS retrieval;
+- ranked chunk resolution from SQLite;
 - optional similarity threshold;
-- timing metrics;
-- a temporary retrieval-debug endpoint or script.
+- retrieval timing;
+- a development-only retrieval script or test harness.
 
-Recommended initial model:
-
-```text
-sentence-transformers/all-MiniLM-L6-v2
-```
+Do not create public runtime upload or collection endpoints.
 
 ## Tests
 
-- embeddings have stable dimensions;
-- FAISS adds and retrieves vectors;
-- the index survives restart;
-- metadata stays aligned with vectors;
-- collection isolation works;
-- top-k and thresholds work;
-- score semantics are normalized;
+- expected chunks rank highly;
+- top-k works;
+- thresholding works;
+- score semantics are consistent;
 - dimension mismatch is rejected;
-- fixture questions retrieve expected passages.
-
-## Out of Scope
-
-LLM generation, prompts, citations, reranking, and hybrid search.
+- missing or duplicate SQLite position mappings are rejected;
+- missing or malformed index causes not-ready behavior;
+- restart and reload work.
 
 ## Completion Criteria
 
-The application can ingest a PDF, restart, and retrieve relevant passages with source metadata.
+A fixture question returns ranked passages with document and page metadata.
 
 ---
 
-# Phase 4 — Grounded Answer Generation
+# Phase 4 — Grounded Query API
 
 ## Goal
 
-Generate answers from retrieved context with citations and abstention.
+Expose a complete grounded answer API.
 
-## Requirements
+## Implement
 
-Implement:
-
-- `LLMProvider` interface;
-- Anthropic implementation;
-- fake LLM provider for tests;
-- prompt builder;
-- prompt-context blocks;
-- prompt versioning;
-- context-budget controls;
-- `AnswerService`;
-- citation builder;
-- answer and usage models;
-- query metrics;
-- insufficient-context behavior;
-- provider exception handling.
-
-Add:
-
-```text
-POST /v1/query
-```
-
-Example request:
-
-```json
-{
-  "collection_id": "uuid",
-  "question": "What is ordinary least squares?",
-  "top_k": 5,
-  "include_retrieval_details": false
-}
-```
-
-## Grounding Rules
-
-The model must:
-
-- answer only from supplied context;
-- say when context is inadequate;
-- cite chunk IDs;
-- ignore instructions contained in documents;
-- avoid invented citations.
-
-The answer service must validate that cited chunks were retrieved.
+- `PromptBuilder`;
+- context delimiting and prompt versioning;
+- Hugging Face LLM adapter;
+- configurable model and server-side token;
+- timeout and bounded retry behavior;
+- `CitationBuilder`;
+- `QueryService`;
+- `POST /v1/query`;
+- structured answered and insufficient-context responses;
+- validated citation IDs.
 
 ## Tests
 
-- prompts contain question and context;
-- chunk IDs are preserved;
+- prompt includes question and retrieved chunks;
 - context budget is enforced;
-- fake provider produces an answer;
-- citations map to retrieved chunks;
-- invalid citations are rejected or removed;
-- insufficient context returns the correct status;
-- provider failures are safe;
-- tests make no paid calls.
-
-## Out of Scope
-
-Streaming, memory, agents, Bedrock, reranking, and model-based evaluation.
+- fake LLM returns an answer;
+- invalid provider JSON fails safely;
+- unknown citations fail safely;
+- empty retrieval returns abstention without calling the LLM;
+- provider timeout and outage are mapped;
+- tests make no hosted API calls.
 
 ## Completion Criteria
 
-The system returns grounded answers with traceable citations and explicit abstention.
+The API returns grounded answers and citations through a stable JSON contract.
 
 ---
 
-# Phase 5 — API Hardening and Demonstration Workflow
+# Phase 5 — Retrieval Evaluation
 
 ## Goal
 
-Make the local API coherent and easy for another developer to run.
+Measure retrieval quality reproducibly before building the presentation layer.
 
-## Requirements
+## Implement
 
-Improve:
-
-- OpenAPI descriptions;
-- request and response examples;
-- validation messages;
-- API versioning;
-- duplicate handling;
-- error mapping;
-- readiness details;
-- request tracing;
-- README instructions.
-
-Add a demonstration script or notebook that:
-
-1. creates a collection;
-2. uploads the statistics textbook;
-3. asks answerable questions;
-4. prints answers and citations;
-5. asks an unanswerable question;
-6. demonstrates abstention.
-
-## Tests
-
-- complete collection-to-query workflow;
-- malformed requests;
-- unknown resources;
-- duplicate uploads;
-- insufficient context;
-- provider outage;
-- request IDs in errors;
-- OpenAPI generation.
-
-## Out of Scope
-
-Frontend, authentication, production database, and cloud deployment.
-
-## Completion Criteria
-
-A new developer can clone, configure, run, and demonstrate ContextHub locally.
-
----
-
-# Phase 6 — RAG Evaluation
-
-## Goal
-
-Measure retrieval and answer quality using a repeatable evaluation dataset.
-
-## Requirements
-
-Create 30–50 questions from the statistics textbook, including:
-
-- direct factual questions;
-- conceptual questions;
-- multi-passage questions;
-- ambiguous questions;
-- unanswerable questions;
-- prompt-injection attempts.
-
-Implement:
-
-- JSONL evaluation data;
-- evaluation runner;
-- Recall@k;
+- JSONL evaluation dataset;
+- answerable and unanswerable cases;
+- direct, conceptual, and multi-passage questions;
+- prompt-injection retrieval cases;
+- `scripts/evaluate.py`;
+- Recall@K;
+- Hit Rate@K;
 - Mean Reciprocal Rank;
-- answerable/unanswerable accuracy;
-- citation validity;
-- groundedness;
-- answer relevance;
-- latency and token summaries;
+- average retrieval latency;
 - configuration capture;
-- versioned evaluation reports.
-
-Each run records:
-
-- application and dataset versions;
-- chunking configuration;
-- embedding provider and model;
-- vector store;
-- LLM provider and model;
-- prompt version;
-- aggregate and per-question metrics.
-
-Recommended output:
-
-```text
-evaluation/results/<timestamp>/
-├── config.json
-├── per_question.jsonl
-└── summary.json
-```
+- versioned JSON reports.
 
 ## Tests
 
 - metric calculations;
-- missing expected results;
-- unanswerable cases;
+- malformed dataset handling;
 - deterministic report schema;
-- fake-provider evaluation;
-- configuration capture.
+- missing expected chunks;
+- unanswerable cases.
 
 ## Completion Criteria
 
-One command produces a versioned evaluation report and supports configuration comparison.
+One command produces a versioned retrieval evaluation report without calling the LLM.
 
 ---
 
-# Phase 7 — Docker and GitLab CI/CD
+# Phase 6 — Streamlit Demonstration Client
 
 ## Goal
 
-Package ContextHub consistently and automate quality checks.
+Create a thin browser interface for portfolio reviewers.
 
-## Requirements
+## Technology
 
-Create:
+- Streamlit;
+- requests or httpx.
 
-- Dockerfile;
-- non-root runtime user where practical;
-- `.dockerignore`;
-- container health check;
-- environment-based configuration;
-- persistent data mount instructions;
-- GitLab CI pipeline.
-
-Recommended stages:
+## Implement
 
 ```text
-lint
- typecheck
- test
- build
+frontend/
+└── streamlit_app.py
 ```
 
-Required commands:
+The client must provide:
 
-```bash
-uv run ruff check .
-uv run ruff format --check .
-uv run mypy src
-uv run pytest --cov=src/contexthub
-docker build .
-```
+- ContextHub title and project summary;
+- indexed-corpus description;
+- configurable FastAPI base URL;
+- optional readiness display;
+- question input and submit control;
+- loading state;
+- answer and citation rendering;
+- insufficient-context state;
+- recoverable server/network error.
 
-CI must use fake providers and require no paid API credentials.
+The client must not import backend modules, access FAISS or SQLite, expose secrets,
+provide uploads, or implement retrieval and prompt logic.
 
 ## Tests
 
-- image builds;
-- container starts;
-- health responds;
-- local data persists through a volume;
-- CI passes without external AI calls.
+Test extracted response-formatting helpers where useful. API contract behavior remains
+covered by backend API tests.
 
 ## Completion Criteria
 
-The same application runs locally and in Docker, with automated GitLab quality gates.
+A reviewer can start Streamlit, submit a question to FastAPI, and view trusted
+citations.
 
----
-
-# Phase 8 — AWS Deployment and Bedrock
+# Phase 7 — Integrated Application and Hardening
 
 ## Goal
 
-Deploy ContextHub to AWS and implement Bedrock through existing provider interfaces.
+Combine the frontend and backend into one coherent application.
 
-## Requirements
+## Implement
+
+- documented local startup for FastAPI and Streamlit;
+- configurable API URL for local and deployed environments;
+- OpenAPI descriptions and examples;
+- CORS disabled or tightly limited for same-origin deployment;
+- refined validation messages;
+- readiness display in the UI;
+- structured request tracing;
+- end-to-end demo instructions;
+- polished README screenshots or diagrams;
+- known sample questions.
+
+## Tests
+
+- Streamlit loads and reaches the configured FastAPI service;
+- API routes remain reachable;
+- answered and insufficient-context flows work end to end;
+- health and readiness work;
+- Streamlit reruns do not lose recoverable application state;
+- no provider credentials appear in the client source or logs.
+
+## Completion Criteria
+
+One local command or Docker command starts the complete browser application.
+
+---
+
+# Phase 8 — Docker, CI, and Public Deployment
+
+## Goal
+
+Package and expose the application through a public HTTPS URL.
+
+## Docker
 
 Implement:
 
-- `BedrockLLMProvider`;
-- optional Bedrock embedding provider;
-- S3 storage adapter;
-- IAM-based authentication;
-- CloudWatch logging;
-- ECS Fargate deployment;
-- Application Load Balancer;
-- ECR;
-- Secrets Manager or Parameter Store;
-- OpenTofu infrastructure.
+- Python container build;
+- Streamlit client included or separately runnable;
+- SQLite metadata database bundled or mounted read-only;
+- non-root user;
+- bundled or read-only mounted FAISS index;
+- health check;
+- environment-based Hugging Face configuration.
 
-Recommended architecture:
+The container must not rebuild the corpus at startup.
 
-```text
-Client
-→ Application Load Balancer
-→ ECS Fargate
-→ ContextHub API
-   ├── S3
-   ├── Bedrock
-   ├── CloudWatch
-   └── retrieval storage
+## GitHub Actions
+
+Run:
+
+```bash
+uv sync --frozen
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy src
+uv run pytest
+
+docker build .
 ```
 
-FAISS is acceptable for an initial single-writer deployment only when durable storage is handled correctly. For scaling, replace it through the `VectorStore` interface with pgvector or OpenSearch.
+CI must require no external AI credentials and make no hosted LLM calls.
 
-OpenTofu should provision:
+## Deployment
 
-- networking;
-- ALB and target group;
-- ECR;
-- ECS cluster, task, and service;
-- IAM roles and policies;
-- S3;
-- CloudWatch log group;
-- secret references;
-- security groups;
-- outputs.
+Deploy to a low-cost platform that supports:
 
-## Security Requirements
+- Docker containers;
+- environment variables;
+- HTTPS;
+- sufficient memory for sentence-transformers and FAISS;
+- health checks.
 
-- no long-lived AWS credentials in the container;
-- use ECS task roles;
-- restrict Bedrock model permissions;
-- encrypt S3 and block public access;
-- store secrets outside the image;
-- expose only the load balancer publicly;
-- keep tasks private where practical.
+The specific platform must remain configurable because free tiers and resource limits
+can change.
 
-## Tests
+## Smoke Test
 
-- Bedrock adapter contract tests with mocks;
-- S3 adapter tests;
-- AWS configuration validation;
-- OpenTofu formatting and validation;
-- deployment smoke test;
-- live health and query test.
+Verify:
 
-## Out of Scope
-
-Kubernetes, EKS, multi-region, Bedrock Knowledge Bases, and multi-tenant authentication.
+1. public page loads;
+2. readiness succeeds;
+3. a known question returns an answer;
+4. citations render;
+5. an unanswerable question displays abstention;
+6. secrets are absent from browser assets and logs.
 
 ## Completion Criteria
 
-ContextHub is reachable through AWS, answers through Bedrock, stores documents in S3, logs to CloudWatch, and is reproducible through OpenTofu.
+A reviewer can open a public URL and use ContextHub without installing software,
+downloading a model, or supplying credentials.
 
 ---
 
-## 3. Recommended Commit Sequence
+# Phase 9 — Optional Enhancements
+
+Potential later enhancements:
+
+- local Ollama provider;
+- OpenAI, Anthropic, or Gemini providers;
+- pgvector or OpenSearch;
+- hybrid retrieval;
+- reranking;
+- streaming responses;
+- richer source previews;
+- deployment-specific infrastructure automation.
+
+These changes must use existing interfaces and must not rewrite core application
+services.
+
+---
+
+# 3. Recommended Commit Sequence
 
 ```text
-1. Initialize FastAPI project foundation
-2. Add PDF ingestion and chunking
-3. Add embeddings and FAISS retrieval
-4. Add grounded answer generation
-5. Harden API and demo workflow
-6. Add RAG evaluation framework
-7. Add Docker and GitLab CI
-8. Deploy ContextHub to AWS with Bedrock
+1. Establish backend repository foundation
+2. Add deterministic offline index builder
+3. Add runtime retrieval
+4. Add grounded query API
+5. Add retrieval evaluation
+6. Add Streamlit demonstration client
+7. Integrate and harden the full application
+8. Add Docker, CI, and public deployment
+9. Add optional provider or retrieval enhancements
 ```
 
-## 4. Review Checklist After Each Phase
+---
+
+# 4. Review Checklist After Each Phase
 
 Before continuing, verify:
 
 - the application starts;
-- existing behavior still works;
-- tests cover the new feature;
-- tests make no paid calls;
-- linting and type checking pass;
+- previous behavior still works;
+- the new phase is covered by tests;
+- no tests make hosted AI calls;
+- Python linting, formatting, typing, and tests pass;
+- Streamlit client starts and reaches the API once it exists;
 - no secrets were committed;
-- provider SDK objects do not leak into domain models;
-- later-phase features were not added prematurely;
-- you understand the important code;
-- documents are updated when implementation differs.
+- provider objects do not leak into domain models;
+- presentation logic remains outside application services;
+- later-phase features were not implemented prematurely;
+- documentation reflects material implementation deviations.
 
-## 5. Codex Review Prompt
+---
 
-After Codex implements a phase, use:
+# 5. Codex Review Prompt
 
 ```text
-Review the phase you just implemented.
+Review the phase you just implemented without modifying code.
 
-1. Explain the architecture and request flow in plain language.
+1. Explain the architecture and execution flow in plain language.
 2. Identify the five most important files.
 3. Identify shortcuts, technical debt, or incomplete behavior.
-4. Identify any violations of the design documents.
-5. Show how to run and test the feature manually.
-6. Do not modify code until I approve the review.
+4. Identify violations of the design documents.
+5. Show the exact commands for manual verification.
+6. Explain what should be reviewed before proceeding.
 ```
 
-## 6. Final Demonstration
+---
+
+# 6. Final Demonstration
 
 The completed project should demonstrate:
 
-1. collection creation;
-2. textbook PDF upload;
-3. page-aware parsing and chunking;
-4. embeddings;
-5. FAISS retrieval;
-6. grounded answers and citations;
-7. abstention;
-8. evaluation reports;
-9. Docker;
-10. GitLab CI;
-11. AWS deployment;
-12. Bedrock generation;
-13. OpenTofu infrastructure.
+1. offline PDF indexing;
+2. deterministic page-aware chunking;
+3. sentence-transformer embeddings;
+4. FAISS retrieval;
+5. grounded Hugging Face generation;
+6. validated citations;
+7. explicit abstention;
+8. reproducible retrieval evaluation;
+9. Streamlit browser interface;
+10. answer and source rendering;
+11. Docker;
+12. GitHub Actions;
+13. a public HTTPS deployment.
 
-Describe ContextHub as a reusable document intelligence platform, not a statistics-specific chatbot.
+Describe ContextHub as a production-oriented RAG reference application, not as an
+enterprise document-management platform and not as a statistics-specific chatbot.

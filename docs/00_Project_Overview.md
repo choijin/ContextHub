@@ -1,325 +1,261 @@
-# RAG
-### A Production-Ready Document Intelligence Platform
+# Project Overview
 
-Version: 0.1
-Author: Jin Choi
-Status: Planning
+**Project:** ContextHub  
+**Subtitle:** Production-Oriented Retrieval-Augmented Generation (RAG) Reference Application  
+**Version:** 1.0  
+**Author:** Jin Choi  
+**Status:** Ready for Implementation
 
 ---
 
 # 1. Vision
 
-ContextHub is a production-ready Retrieval-Augmented Generation (RAG) platform that enables users to upload document collections and ask natural language questions grounded entirely in those documents.
+ContextHub is a production-oriented RAG application built to demonstrate Machine
+Learning Engineering and software engineering practices.
 
-Unlike traditional "chat with PDF" applications, DocuMind is designed as a modular software platform emphasizing clean architecture, maintainability, extensibility, and production engineering practices.
+Rather than being a notebook-based “chat with your PDF” demo, ContextHub is a
+complete deployable application. A visitor opens the web interface, submits a
+question, receives a grounded answer, and reviews citations linked to the indexed
+documents.
 
-The first supported document corpus will be a statistics textbook, but the system will be capable of supporting arbitrary document collections such as:
-
-- Books
-- Technical documentation
-- Company policies
-- Insurance manuals
-- Financial filings
-- Research papers
-
-without requiring application code changes.
+The application follows a build-once, query-many model. Project maintainers replace
+the fixed PDF corpus and rebuild the index offline. Runtime users do not upload or
+manage documents.
 
 ---
 
 # 2. Problem Statement
 
-Large Language Models possess broad knowledge but cannot reliably answer questions about proprietary or user-provided documents.
+Many RAG projects demonstrate retrieval and generation but stop at a notebook or an
+API endpoint. They often lack:
 
-Organizations frequently need an AI assistant capable of:
+- modular architecture;
+- automated testing;
+- reproducible indexing;
+- retrieval evaluation;
+- deployment readiness;
+- provider abstraction;
+- a usable browser interface.
 
-- ingesting internal documentation
-- retrieving relevant information
-- answering with citations
-- avoiding hallucinations
-- supporting continuously updated document collections
-
-Current "RAG demos" are typically notebooks or tightly coupled scripts that cannot scale into maintainable software systems.
-
-ContextHub aims to solve this by implementing retrieval-augmented generation using modern software engineering principles.
-
----
-
-# 3. Goals
-
-Primary goals
-
-- Build a reusable RAG platform
-- Demonstrate software engineering practices
-- Demonstrate MLOps practices
-- Demonstrate cloud deployment
-- Demonstrate clean architecture
-- Demonstrate testing
-- Demonstrate evaluation of RAG systems
-
-Secondary goals
-
-- Support multiple document collections
-- Support multiple embedding providers
-- Support multiple LLM providers
-- Support multiple vector databases
-- Support cloud deployment
+ContextHub demonstrates how to deliver a small but complete RAG product without
+introducing enterprise-scale complexity.
 
 ---
 
-# 4. Non Goals
+# 3. Project Goals
 
-Version 1 will NOT include
+## Primary Goals
 
-- Authentication
-- User accounts
-- OCR
-- Image understanding
-- Voice
-- Web frontend
-- Agentic workflows
-- Multi-user support
-- Streaming responses
-- Conversation memory
+- Demonstrate Machine Learning Engineering practices.
+- Demonstrate clean software architecture.
+- Build a reusable RAG backend.
+- Expose the system through a simple browser-based interface.
+- Show reproducible indexing and retrieval evaluation.
+- Deploy a portfolio application that hiring managers can use directly.
+- Keep infrastructure and operating cost minimal.
 
-These may be introduced in later releases.
+## Secondary Goals
 
----
-
-# 5. Target Users
-
-Primary User
-
-A technical user who uploads documentation and asks grounded questions.
-
-Future Users
-
-- Data Scientists
-- ML Engineers
-- Software Engineers
-- Analysts
-- Researchers
+- Support interchangeable LLM providers.
+- Support interchangeable embedding providers.
+- Support interchangeable vector stores.
+- Keep the frontend thin and the backend independently testable.
+- Make the project easy to explain in technical interviews.
 
 ---
 
-# 6. Version 1 Scope
+# 4. Version 1 Workflow
 
-The MVP consists of the following workflow.
+## Corpus Build
 
-Upload PDF
-
-↓
-
-Extract Text
-
-↓
-
-Normalize Text
-
-↓
-
-Chunk Document
-
-↓
-
+```text
+Replace PDFs in data/pdfs/
+        ↓
+Run scripts/ingest.py
+        ↓
+Parse and Chunk Documents
+        ↓
 Generate Embeddings
+        ↓
+Build FAISS Vector Index, SQLite Metadata Database, and Manifest
+```
 
-↓
+## User Experience
 
-Store Vector Index
+```text
+Open ContextHub Web Page
+        ↓
+Enter a Question
+        ↓
+Web UI Calls POST /v1/query
+        ↓
+FastAPI Retrieves Context
+        ↓
+Hugging Face Generates an Answer
+        ↓
+UI Displays Answer and Sources
+```
 
-↓
-
-Receive Question
-
-↓
-
-Retrieve Relevant Chunks
-
-↓
-
-Generate Grounded Answer
-
-↓
-
-Return Answer with Citations
-
----
-
-# 7. Functional Requirements
-
-The system shall:
-
-- ingest PDF documents
-- extract text
-- preserve document metadata
-- split documents into chunks
-- generate embeddings
-- store embeddings in a vector database
-- retrieve relevant chunks
-- construct prompts
-- generate answers
-- return citations
+Documents are **not uploaded at runtime**.
 
 ---
 
-# 8. Non Functional Requirements
+# 5. Version 1 Scope
 
-The system should
+## Included
 
-- be modular
-- be testable
-- support dependency injection
-- support multiple providers
-- support Docker deployment
-- support CI/CD
-- expose REST APIs
-- produce structured logs
-- support future cloud deployment
+- Fixed PDF corpus.
+- Offline PDF parsing and indexing.
+- Recursive page-aware chunking.
+- Sentence-transformer embeddings.
+- FAISS vector retrieval.
+- Grounded answer generation.
+- Validated citations.
+- FastAPI backend.
+- Minimal Streamlit demonstration client.
+- Docker.
+- GitHub Actions.
+- Structured logging.
+- Unit, integration, API, and frontend tests.
+- Retrieval evaluation.
+- Environment-based configuration.
+- Public web deployment.
 
----
+## Excluded
 
-# 9. High Level Architecture
-
-                REST API
-
-                    │
-
-            Answer Service
-
-        ┌───────────┴───────────┐
-
-    Retriever             LLM Provider
-
-        │                       │
-
-Vector Store            Prompt Builder
-
-        │
-
-Embedding Provider
-
-        │
-
-Chunking Service
-
-        │
-
-Document Parser
-
-        │
-
-Uploaded Documents
+- Runtime uploads.
+- Document collections.
+- Authentication and user accounts.
+- Conversation history.
+- OCR.
+- Agents.
+- Tool calling.
+- LangChain (reserved for Version 2).
+- Workflow orchestration.
+- Multi-tenancy.
+- Kubernetes.
+- Production database.
+- Complex frontend state management.
 
 ---
 
-# 10. Technology Stack
+# 6. Target Users
 
-Language
+The runtime user is a hiring manager, interviewer, developer, or other portfolio
+visitor who wants to test the application through a browser.
 
-Python 3.12
-
-Framework
-
-FastAPI
-
-Validation
-
-Pydantic
-
-Package Management
-
-uv
-
-Testing
-
-pytest
-
-Linting
-
-Ruff
-
-Type Checking
-
-mypy
-
-Embeddings
-
-Sentence Transformers
-
-Vector Store
-
-FAISS
-
-LLM
-
-Anthropic Claude
-
-Containerization
-
-Docker
-
-CI/CD
-
-GitLab CI
-
-Cloud (Future)
-
-AWS
-
-Infrastructure (Future)
-
-OpenTofu
-
-Enterprise AI (Future)
-
-AWS Bedrock
+The repository user is a developer who wants to replace the PDF corpus, rebuild the
+index, run evaluations, or extend providers.
 
 ---
 
-# 11. Success Criteria
+# 7. Technology Stack
 
-Version 1 is considered complete when:
+| Area | Technology |
+|---|---|
+| Backend language | Python 3.12 |
+| Backend API | FastAPI |
+| Validation | Pydantic v2 |
+| Python package manager | uv |
+| PDF parsing | PyMuPDF |
+| Embeddings | sentence-transformers |
+| Vector index | FAISS |
+| Metadata database | SQLite |
+| LLM | Hugging Face Inference API |
+| Frontend | Streamlit |
+| Frontend HTTP | requests (HTTP client) |
+| Backend tests | pytest |
+| Python quality | Ruff and mypy |
+| Containerization | Docker |
+| CI/CD | GitHub Actions |
 
-✓ A PDF can be uploaded
-
-✓ The document is parsed
-
-✓ Embeddings are generated
-
-✓ Questions can be answered
-
-✓ Citations are returned
-
-✓ Docker image builds successfully
-
-✓ Unit tests pass
-
-✓ CI pipeline passes
+The Streamlit client is intentionally thin. It communicates with FastAPI exclusively over HTTP. All retrieval, generation, and business logic belong in the FastAPI backend.
 
 ---
 
-# 12. Future Roadmap
+# 8. Version 1 User Interface
 
-Version 2
+The Streamlit demonstration client should contain:
 
-- Multiple document collections
-- Evaluation framework
-- Metadata filtering
+- project title and brief explanation;
+- question input;
+- submit button;
+- loading state;
+- answer panel;
+- source cards with document name and page range;
+- insufficient-context message;
+- recoverable error message.
 
-Version 3
+The interface does not need:
 
-- Dynamic uploads
-- pgvector
-- Observability
+- login;
+- document upload;
+- chat history;
+- multiple conversations;
+- rich text editing;
+- administrative pages;
+- complex navigation.
 
-Version 4
+---
 
-- OpenTofu deployment
-- ECS
-- CloudWatch
+# 9. Success Criteria
 
-Version 5
+Version 1 is complete when:
 
-- AWS Bedrock
-- Kubernetes
-- Autoscaling
+- A new corpus can be indexed by replacing the PDF folder.
+- The saved FAISS index and SQLite metadata database can be loaded after restart.
+- Every FAISS result maps deterministically to a chunk stored in SQLite.
+- Retrieval returns relevant passages.
+- Answers are grounded only in retrieved context.
+- Responses include validated citations.
+- Retrieval metrics can be generated.
+- A visitor can open a deployed URL and submit a question.
+- The web UI displays answers, citations, loading, errors, and abstention.
+- The application runs locally through Docker.
+- GitHub Actions passes backend typing, linting, testing, Docker, and application checks.
+
+---
+
+# 10. Final Portfolio Demonstration
+
+A reviewer should be able to:
+
+1. Open the deployed ContextHub URL.
+2. Read what corpus the application covers.
+3. Ask an answerable question.
+4. View the answer and supporting sources.
+5. Ask an unanswerable question.
+6. See an explicit insufficient-context response.
+7. Review the repository for architecture, tests, CI, Docker, and evaluation results.
+
+---
+
+# 11. Roadmap
+
+## Version 1
+Build every RAG component from first principles using FastAPI, Streamlit, FAISS, and Hugging Face.
+
+## Version 2
+Introduce LangChain selectively while preserving the FastAPI API contract and Streamlit client.
+
+## Version 2.5
+Deploy the application publicly with a free or minimal-cost hosting platform and include a demo video as a fallback.
+
+---
+
+# 12. Future Enhancements
+
+Potential future improvements include:
+
+- Ollama or another local LLM provider.
+- OpenAI, Anthropic, or Gemini providers.
+- pgvector or OpenSearch.
+- Hybrid retrieval.
+- Metadata filtering.
+- Reranking.
+- Streaming responses.
+- Richer source previews.
+- Additional deployment targets.
+
+These enhancements should use existing interfaces without rewriting application
+services.
