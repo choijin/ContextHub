@@ -3,11 +3,16 @@ name = "contexthub"
 version = "1.0.0"
 description = "Production-oriented retrieval-augmented generation reference application."
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.12,<3.13"
 dependencies = [
+    "faiss-cpu>=1.8.0,<2.0.0",
     "fastapi>=0.116.0,<1.0.0",
+    "numpy>=1.26.0,<2.0.0",
     "pydantic>=2.11.0,<3.0.0",
     "pydantic-settings>=2.10.0,<3.0.0",
+    "pymupdf>=1.24.0,<2.0.0",
+    "sentence-transformers>=3.0.0,<4.0.0",
+    "torch>=2.2.0,<2.3.0",
     "uvicorn[standard]>=0.35.0,<1.0.0",
 ]
 
