@@ -17,5 +17,6 @@ data/index/*
 !data/index/.gitkeep
 data/pdfs/*
 !data/pdfs/.gitkeep
+!data/pdfs/sample.pdf
 data/evaluation/*
 !data/evaluation/.gitkeep
