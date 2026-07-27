@@ -71,6 +71,14 @@ metadata.db
 manifest.json
 ```
 
+Test runtime retrieval without an LLM:
+
+```bash
+uv run python scripts/retrieve.py "What is conditional probability?" --top-k 3
+```
+
+This prints ranked chunks, similarity scores, chunk IDs, and source page ranges.
+
 Run quality gates:
 
 ```bash

@@ -5,6 +5,7 @@ from uuid import UUID
 
 from contexthub.domain.models.chunk import Chunk, ChunkingConfig
 from contexthub.domain.models.document import Document, DocumentPage, NormalizedDocument
+from contexthub.domain.models.query import VectorSearchResult
 
 
 class FakeDocumentParser:
@@ -33,8 +34,21 @@ class FakeEmbeddingProvider:
 
     @staticmethod
     def _embed(text: str) -> list[float]:
-        length = float(max(len(text), 1))
-        return [length, length / 2.0, 1.0]
+        lowered = text.lower()
+        if "alpha" in lowered or "regularization" in lowered:
+            return [1.0, 0.0, 0.0]
+        if "beta" in lowered or "probability" in lowered:
+            return [0.0, 1.0, 0.0]
+        return [0.0, 0.0, 1.0]
+
+
+class TrackingEmbeddingProvider(FakeEmbeddingProvider):
+    def __init__(self) -> None:
+        self.query_calls: list[str] = []
+
+    def embed_query(self, text: str) -> list[float]:
+        self.query_calls.append(text)
+        return super().embed_query(text)
 
 
 class FailingVectorStore:
@@ -49,7 +63,7 @@ class FailingVectorStore:
         query_embedding: list[float],
         top_k: int,
         similarity_threshold: float | None = None,
-    ) -> list[object]:
+    ) -> list[VectorSearchResult]:
         return []
 
     def save(self, directory: Path) -> None:
@@ -91,6 +105,46 @@ class InMemoryDocumentRepository:
 
     def close(self) -> None:
         return None
+
+    def validate_faiss_positions(self, expected_count: int) -> None:
+        return None
+
+
+class InMemoryVectorStore:
+    dimensions = 3
+    vector_count = 3
+
+    def __init__(self, results: list[VectorSearchResult] | None = None) -> None:
+        self.results = results or [
+            VectorSearchResult(position=0, score=0.9, rank=1),
+            VectorSearchResult(position=1, score=0.8, rank=2),
+        ]
+        self.search_calls: list[tuple[list[float], int, float | None]] = []
+
+    def build(self, embeddings: list[list[float]], chunks: list[Chunk]) -> None:
+        return None
+
+    def search(
+        self,
+        query_embedding: list[float],
+        top_k: int,
+        similarity_threshold: float | None = None,
+    ) -> list[VectorSearchResult]:
+        self.search_calls.append((query_embedding, top_k, similarity_threshold))
+        return [
+            result
+            for result in self.results[:top_k]
+            if similarity_threshold is None or result.score >= similarity_threshold
+        ]
+
+    def save(self, directory: Path) -> None:
+        return None
+
+    def load(self, directory: Path) -> None:
+        return None
+
+    def is_loaded(self) -> bool:
+        return True
 
 
 def small_chunking_config() -> ChunkingConfig:

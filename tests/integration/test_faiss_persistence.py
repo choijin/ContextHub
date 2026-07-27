@@ -19,7 +19,7 @@ def test_faiss_vector_store_build_save_and_load(tmp_path: Path) -> None:
     loaded = FaissVectorStore(dimensions=3)
     loaded.load(tmp_path)
 
-    assert results[0].chunk.id == "chunk-a"
+    assert results[0].position == 0
     assert (tmp_path / "faiss.index").exists()
     assert loaded.is_loaded()
     assert loaded.vector_count == 2

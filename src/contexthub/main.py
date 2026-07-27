@@ -32,7 +32,10 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
             resolved_settings.environment,
         )
         app.state.runtime_container = get_runtime_container(resolved_settings)
-        yield
+        try:
+            yield
+        finally:
+            app.state.runtime_container.close()
 
     app = FastAPI(
         title=resolved_settings.app_name,

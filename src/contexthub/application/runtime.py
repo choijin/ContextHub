@@ -2,6 +2,9 @@
 
 from dataclasses import dataclass, field
 
+from contexthub.application.ports.document_repository import DocumentRepository
+from contexthub.application.services.retrieval_service import RetrievalService
+
 
 @dataclass(frozen=True)
 class ReadinessCheck:
@@ -18,7 +21,14 @@ class RuntimeContainer:
 
     initialized: bool = False
     checks: list[ReadinessCheck] = field(default_factory=list)
+    retrieval_service: RetrievalService | None = None
+    document_repository: DocumentRepository | None = None
+    manifest: object | None = None
 
     @property
     def ready(self) -> bool:
         return self.initialized and all(check.ready for check in self.checks)
+
+    def close(self) -> None:
+        if self.document_repository is not None:
+            self.document_repository.close()
