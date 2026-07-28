@@ -13,7 +13,7 @@ from contexthub.domain.exceptions import (
     VectorStoreError,
 )
 from contexthub.domain.models.chunk import Chunk
-from contexthub.domain.models.query import RetrievedChunk
+from contexthub.domain.models.query import VectorSearchResult
 
 FAISS_INDEX_FILENAME = "faiss.index"
 
@@ -59,7 +59,7 @@ class FaissVectorStore:
         query_embedding: list[float],
         top_k: int,
         similarity_threshold: float | None = None,
-    ) -> list[RetrievedChunk]:
+    ) -> list[VectorSearchResult]:
         if self._index is None:
             raise IndexNotLoadedError("FAISS index is not loaded.")
         if top_k <= 0:
@@ -67,7 +67,7 @@ class FaissVectorStore:
         query = self._vectors_from_embeddings([query_embedding])
         top_k = min(top_k, self.vector_count)
         distances, positions = self._index.search(query, top_k)
-        results: list[RetrievedChunk] = []
+        results: list[VectorSearchResult] = []
         for score, position in zip(distances[0].tolist(), positions[0].tolist(), strict=True):
             if position < 0:
                 continue
@@ -75,8 +75,8 @@ class FaissVectorStore:
             if similarity_threshold is not None and normalized_score < similarity_threshold:
                 continue
             results.append(
-                RetrievedChunk(
-                    chunk=self._chunks[int(position)],
+                VectorSearchResult(
+                    position=int(position),
                     score=normalized_score,
                     rank=len(results) + 1,
                 )

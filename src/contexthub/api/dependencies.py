@@ -1,38 +1,110 @@
 """Composition helpers for runtime dependencies."""
 
+import logging
+
 from contexthub.application.runtime import ReadinessCheck, RuntimeContainer
+from contexthub.application.services.retrieval_service import RetrievalService
 from contexthub.config.settings import ApplicationSettings
+from contexthub.domain.exceptions import ContextHubError
+from contexthub.infrastructure.embeddings.sentence_transformer_provider import (
+    SentenceTransformerEmbeddingProvider,
+)
+from contexthub.infrastructure.index.manifest import (
+    load_manifest,
+    validate_manifest,
+    validate_manifest_settings,
+)
+from contexthub.infrastructure.repositories.sqlite_document_repository import (
+    SQLiteDocumentRepository,
+)
+from contexthub.infrastructure.vectorstores.faiss_vector_store import FaissVectorStore
 
 
 def build_runtime_container(settings: ApplicationSettings) -> RuntimeContainer:
-    """Build the Phase 1 dependency container.
+    """Build runtime dependencies for retrieval."""
 
-    Later phases will add concrete index, repository, embedding, and LLM providers here.
-    """
-
-    checks = [
-        ReadinessCheck(
-            name="settings",
-            ready=True,
-            detail="Application settings loaded.",
-        ),
-        ReadinessCheck(
-            name="runtime_dependencies",
-            ready=True,
-            detail="Phase 1 runtime dependency skeleton initialized.",
-        ),
+    checks: list[ReadinessCheck] = [
+        ReadinessCheck(name="settings", ready=True, detail="Application settings loaded.")
     ]
-
-    if not settings.allow_start_without_index:
+    try:
+        return _build_ready_container(settings, checks)
+    except ContextHubError as exc:
         checks.append(
             ReadinessCheck(
                 name="index",
                 ready=False,
-                detail="Index loading is implemented in a later phase.",
+                detail=str(exc),
             )
         )
+        return RuntimeContainer(initialized=True, checks=checks)
 
-    return RuntimeContainer(initialized=True, checks=checks)
+
+def _build_ready_container(
+    settings: ApplicationSettings,
+    checks: list[ReadinessCheck],
+) -> RuntimeContainer:
+    manifest = load_manifest(settings.index_directory)
+    validate_manifest_settings(manifest, settings)
+    checks.append(ReadinessCheck(name="manifest", ready=True, detail="Index manifest loaded."))
+
+    embedding_provider = SentenceTransformerEmbeddingProvider(
+        model_name=settings.embedding_model,
+        batch_size=settings.embedding_batch_size,
+        device=settings.embedding_device,
+    )
+    embedding_dimensions = embedding_provider.dimensions
+    validate_manifest(manifest, settings, embedding_dimensions)
+    checks.append(
+        ReadinessCheck(
+            name="embedding_provider",
+            ready=True,
+            detail="Embedding provider initialized and manifest-compatible.",
+        )
+    )
+
+    vector_store = FaissVectorStore(dimensions=embedding_dimensions)
+    vector_store.load(settings.index_directory)
+    if vector_store.vector_count != manifest.chunk_count:
+        msg = "FAISS vector count does not match manifest chunk count."
+        raise ContextHubError(msg)
+    checks.append(ReadinessCheck(name="faiss", ready=True, detail="FAISS index loaded."))
+
+    repository = SQLiteDocumentRepository(settings.metadata_database_path, read_only=True)
+    if repository.chunk_count() != manifest.chunk_count:
+        repository.close()
+        msg = "SQLite chunk count does not match manifest chunk count."
+        raise ContextHubError(msg)
+    repository.validate_faiss_positions(vector_store.vector_count)
+    checks.append(
+        ReadinessCheck(
+            name="metadata_database",
+            ready=True,
+            detail="SQLite metadata database opened and FAISS positions validated.",
+        )
+    )
+
+    retrieval_service = RetrievalService(
+        embedding_provider=embedding_provider,
+        vector_store=vector_store,
+        document_repository=repository,
+        settings=settings,
+        logger=logging.getLogger("contexthub.retrieval"),
+    )
+    checks = [
+        *checks,
+        ReadinessCheck(
+            name="retrieval_service",
+            ready=True,
+            detail="Retrieval service initialized.",
+        ),
+    ]
+    return RuntimeContainer(
+        initialized=True,
+        checks=checks,
+        retrieval_service=retrieval_service,
+        document_repository=repository,
+        manifest=manifest,
+    )
 
 
 def get_runtime_container(settings: ApplicationSettings) -> RuntimeContainer:

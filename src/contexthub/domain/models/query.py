@@ -7,6 +7,26 @@ from pydantic import BaseModel, Field, field_validator
 from contexthub.domain.models.chunk import Chunk
 
 
+class VectorSearchResult(BaseModel):
+    position: int
+    score: float
+    rank: int
+
+    @field_validator("position")
+    @classmethod
+    def validate_position(cls, value: int) -> int:
+        if value < 0:
+            raise ValueError("position must be non-negative")
+        return value
+
+    @field_validator("rank")
+    @classmethod
+    def validate_search_rank(cls, value: int) -> int:
+        if value < 1:
+            raise ValueError("rank must be one-based")
+        return value
+
+
 class QueryRequest(BaseModel):
     question: str
     top_k: int = 5

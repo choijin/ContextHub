@@ -161,6 +161,11 @@ class SQLiteDocumentRepository:
             raise RepositoryError("Failed to load FAISS positions.") from exc
         return [int(row["faiss_position"]) for row in rows]
 
+    def validate_faiss_positions(self, expected_count: int) -> None:
+        positions = self.faiss_positions()
+        if positions != list(range(expected_count)):
+            raise RepositoryError("FAISS positions are not contiguous and zero-based.")
+
     def close(self) -> None:
         self._connection.close()
 
