@@ -6,6 +6,7 @@ from contexthub.application.services.retrieval_service import RetrievalService
 from contexthub.config.settings import ApplicationSettings
 from contexthub.domain.exceptions import InvalidQueryError
 from contexthub.domain.models.chunk import Chunk
+from contexthub.domain.models.document import Document
 from tests.fakes.indexing import (
     InMemoryDocumentRepository,
     InMemoryVectorStore,
@@ -31,6 +32,7 @@ def test_retrieval_service_embeds_query_and_searches_vector_store() -> None:
     assert vector_store.search_calls[0][1:] == (2, 0.5)
     assert [chunk.chunk.id for chunk in result.chunks] == ["chunk-a", "chunk-b"]
     assert [chunk.rank for chunk in result.chunks] == [1, 2]
+    assert [chunk.document_name for chunk in result.chunks] == ["fixture.pdf", "fixture.pdf"]
 
 
 def test_retrieval_service_rejects_blank_question() -> None:
@@ -77,6 +79,14 @@ def test_retrieval_service_applies_similarity_threshold() -> None:
 def _repository() -> InMemoryDocumentRepository:
     document_id = uuid4()
     repository = InMemoryDocumentRepository()
+    repository.documents = [
+        Document(
+            id=document_id,
+            filename="fixture.pdf",
+            checksum_sha256="checksum",
+            page_count=1,
+        )
+    ]
     repository.chunks = [
         _chunk("chunk-a", document_id, 0),
         _chunk("chunk-b", document_id, 1),

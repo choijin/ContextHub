@@ -3,6 +3,8 @@
 import logging
 
 from contexthub.application.runtime import ReadinessCheck, RuntimeContainer
+from contexthub.application.services.citation_builder import CitationBuilder
+from contexthub.application.services.query_service import QueryService
 from contexthub.application.services.retrieval_service import RetrievalService
 from contexthub.config.settings import ApplicationSettings
 from contexthub.domain.exceptions import ContextHubError
@@ -14,6 +16,8 @@ from contexthub.infrastructure.index.manifest import (
     validate_manifest,
     validate_manifest_settings,
 )
+from contexthub.infrastructure.llms.huggingface_provider import HuggingFaceLLMProvider
+from contexthub.infrastructure.prompts.grounded_qa_prompt_builder import GroundedQAPromptBuilder
 from contexthub.infrastructure.repositories.sqlite_document_repository import (
     SQLiteDocumentRepository,
 )
@@ -90,6 +94,44 @@ def _build_ready_container(
         settings=settings,
         logger=logging.getLogger("contexthub.retrieval"),
     )
+    if not settings.has_required_llm_configuration:
+        checks.append(
+            ReadinessCheck(
+                name="llm_provider",
+                ready=False,
+                detail="Hugging Face model and API token are required for query generation.",
+            )
+        )
+        return RuntimeContainer(
+            initialized=True,
+            checks=checks,
+            retrieval_service=retrieval_service,
+            document_repository=repository,
+            manifest=manifest,
+        )
+
+    llm_provider = HuggingFaceLLMProvider(
+        api_token=settings.huggingface_api_token.get_secret_value()
+        if settings.huggingface_api_token is not None
+        else "",
+        model_name=settings.huggingface_model,
+        timeout_seconds=settings.llm_timeout_seconds,
+        max_retries=settings.llm_max_retries,
+        temperature=settings.llm_temperature,
+        max_output_tokens=settings.llm_max_output_tokens,
+    )
+    prompt_builder = GroundedQAPromptBuilder(
+        max_context_characters=settings.max_context_characters,
+    )
+    citation_builder = CitationBuilder()
+    query_service = QueryService(
+        retriever=retrieval_service,
+        prompt_builder=prompt_builder,
+        llm_provider=llm_provider,
+        citation_builder=citation_builder,
+        settings=settings,
+        logger=logging.getLogger("contexthub.query"),
+    )
     checks = [
         *checks,
         ReadinessCheck(
@@ -97,12 +139,24 @@ def _build_ready_container(
             ready=True,
             detail="Retrieval service initialized.",
         ),
+        ReadinessCheck(
+            name="llm_provider",
+            ready=True,
+            detail="LLM provider initialized.",
+        ),
+        ReadinessCheck(
+            name="query_service",
+            ready=True,
+            detail="Grounded query service initialized.",
+        ),
     ]
     return RuntimeContainer(
         initialized=True,
         checks=checks,
         retrieval_service=retrieval_service,
+        query_service=query_service,
         document_repository=repository,
+        llm_provider=llm_provider,
         manifest=manifest,
     )
 

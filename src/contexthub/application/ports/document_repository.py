@@ -1,6 +1,7 @@
 """Document metadata repository port."""
 
 from typing import Protocol
+from uuid import UUID
 
 from contexthub.domain.models.chunk import Chunk
 from contexthub.domain.models.document import Document
@@ -17,6 +18,8 @@ class DocumentRepository(Protocol):
     ) -> None: ...
 
     def get_chunks_by_positions(self, positions: list[int]) -> list[Chunk]: ...
+
+    def get_document_filenames(self, document_ids: list[UUID]) -> dict[UUID, str]: ...
 
     def chunk_count(self) -> int: ...
 
