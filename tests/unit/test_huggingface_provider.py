@@ -20,15 +20,36 @@ def test_huggingface_provider_returns_generation_result() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         nonlocal request_count
         request_count += 1
+        payload = request.read().decode()
         assert request.headers["authorization"] == "Bearer token"
-        assert "chunk-a" in str(request.read())
-        return httpx.Response(200, json=[{"generated_text": '{"answer":"a","citation_ids":[]}'}])
+        assert str(request.url) == "https://router.huggingface.co/v1/chat/completions"
+        assert '"model":"model"' in payload
+        assert '"role":"system"' in payload
+        assert '"role":"user"' in payload
+        assert '"response_format"' in payload
+        assert '"type":"json_schema"' in payload
+        assert '"strict":true' in payload
+        assert "cited_source_indices" in payload
+        assert "chunk-a" in payload
+        return httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "role": "assistant",
+                            "content": '{"answer":"a","cited_source_indices":[1]}',
+                        }
+                    }
+                ]
+            },
+        )
 
     provider = _provider(handler)
 
     result = provider.generate(_prompt())
 
-    assert result.text == '{"answer":"a","citation_ids":[]}'
+    assert result.text == '{"answer":"a","cited_source_indices":[1]}'
     assert result.provider == "huggingface"
     assert result.model == "model"
     assert request_count == 1
@@ -94,6 +115,7 @@ def _prompt() -> PromptRequest:
         question="question",
         context=[
             PromptContext(
+                source_index=1,
                 chunk_id="chunk-a",
                 document_name="fixture.pdf",
                 page_start=1,

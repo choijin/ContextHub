@@ -20,7 +20,7 @@ def test_query_service_returns_fake_llm_answer_with_trusted_citation() -> None:
     retrieved_chunk = _retrieved_chunk("chunk-a", "Probability measures uncertainty.")
     retriever = FakeRetriever(_retrieval_result([retrieved_chunk]))
     llm_provider = FakeLLMProvider(
-        '{"answer": "Probability measures uncertainty.", "citation_ids": ["chunk-a"]}'
+        '{"answer": "Probability measures uncertainty.", "cited_source_indices": [1]}'
     )
     service = _service(retriever, llm_provider)
 
@@ -43,10 +43,68 @@ def test_query_service_invalid_provider_json_fails_safely() -> None:
         service.query(QueryRequest(question="What is probability?"))
 
 
-def test_query_service_unknown_citation_fails_safely() -> None:
+def test_query_service_logs_invalid_provider_json_preview(caplog: pytest.LogCaptureFixture) -> None:
     service = _service(
         FakeRetriever(_retrieval_result([_retrieved_chunk("chunk-a", "text")])),
-        FakeLLMProvider('{"answer": "answer", "citation_ids": ["missing"]}'),
+        FakeLLMProvider("not json"),
+    )
+
+    with pytest.raises(LLMProviderResponseError):
+        service.query(QueryRequest(question="What is probability?"))
+
+    record = next(
+        record for record in caplog.records if record.message == "llm_provider_invalid_json"
+    )
+    assert record.extra_fields["response_preview"] == "not json"
+
+
+def test_query_service_logs_retrieved_chunk_metadata(caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level("INFO")
+    service = _service(
+        FakeRetriever(_retrieval_result([_retrieved_chunk("chunk-a", "source text")])),
+        FakeLLMProvider('{"answer": "answer", "cited_source_indices": [1]}'),
+    )
+
+    answer = service.query(QueryRequest(question="What is probability?"))
+
+    assert answer.status is AnswerStatus.ANSWERED
+    record = next(
+        record for record in caplog.records if record.message == "query_retrieved_context"
+    )
+    logged_chunk = record.extra_fields["chunks"][0]
+    assert logged_chunk["chunk_id"] == "chunk-a"
+    assert logged_chunk["document_name"] == "stats.pdf"
+    assert logged_chunk["pages"] == "1-1"
+    assert logged_chunk["text_preview"] == "source text"
+
+
+def test_query_service_rejects_json_wrapped_in_markdown_fence() -> None:
+    service = _service(
+        FakeRetriever(_retrieval_result([_retrieved_chunk("chunk-a", "text")])),
+        FakeLLMProvider('```json\n{"answer": "answer", "cited_source_indices": [1]}\n```'),
+    )
+
+    with pytest.raises(LLMProviderResponseError):
+        service.query(QueryRequest(question="What is probability?"))
+
+
+def test_query_service_rejects_json_with_raw_latex_backslashes() -> None:
+    service = _service(
+        FakeRetriever(_retrieval_result([_retrieved_chunk("chunk-a", "text")])),
+        FakeLLMProvider(
+            '{"answer": "Conditional probability is denoted \\(P(A|B)\\).", '
+            '"cited_source_indices": [1]}'
+        ),
+    )
+
+    with pytest.raises(LLMProviderResponseError):
+        service.query(QueryRequest(question="What is probability?"))
+
+
+def test_query_service_unknown_source_index_fails_safely() -> None:
+    service = _service(
+        FakeRetriever(_retrieval_result([_retrieved_chunk("chunk-a", "text")])),
+        FakeLLMProvider('{"answer": "answer", "cited_source_indices": [2]}'),
     )
 
     with pytest.raises(CitationValidationError):

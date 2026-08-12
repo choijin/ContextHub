@@ -176,7 +176,10 @@ class FakeLLMProvider:
     provider_name = "fake"
     model_name = "fake-model"
 
-    def __init__(self, text: str = '{"answer": "Fake answer.", "citation_ids": []}') -> None:
+    def __init__(
+        self,
+        text: str = '{"answer": "Fake answer.", "cited_source_indices": [1]}',
+    ) -> None:
         self.text = text
         self.calls: list[PromptRequest] = []
 

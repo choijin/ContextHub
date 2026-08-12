@@ -44,7 +44,8 @@ def main(argv: list[str] | None = None) -> int:
         preview = " ".join(chunk.text.split())[:240]
         print(
             f"\n#{retrieved.rank} score={retrieved.score:.4f} "
-            f"chunk_id={chunk.id} pages={chunk.page_start}-{chunk.page_end}"
+            f"chunk_id={chunk.id} document={retrieved.document_name} "
+            f"pages={chunk.page_start}-{chunk.page_end}"
         )
         print(preview)
     return 0

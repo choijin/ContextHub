@@ -12,7 +12,9 @@ from contexthub.domain.exceptions import (
     IndexNotLoadedError,
     InvalidQueryError,
     LLMProviderAuthenticationError,
+    LLMProviderError,
     LLMProviderRateLimitError,
+    LLMProviderResponseError,
     LLMProviderTimeoutError,
     LLMProviderUnavailableError,
 )
@@ -37,15 +39,20 @@ async def contexthub_error_handler(request: Request, exc: Exception) -> JSONResp
     status_code = 500
     if isinstance(exc, InvalidQueryError):
         status_code = 422
-    if isinstance(exc, IndexNotLoadedError | IndexLoadError | IndexCompatibilityError):
-        status_code = 503
-    if isinstance(
+    elif isinstance(
         exc,
-        LLMProviderUnavailableError | LLMProviderTimeoutError | LLMProviderRateLimitError,
+        IndexNotLoadedError
+        | IndexLoadError
+        | IndexCompatibilityError
+        | LLMProviderUnavailableError
+        | LLMProviderTimeoutError
+        | LLMProviderRateLimitError,
     ):
         status_code = 503
-    if isinstance(exc, LLMProviderAuthenticationError):
+    elif isinstance(exc, LLMProviderAuthenticationError):
         status_code = 500
+    elif isinstance(exc, LLMProviderResponseError | LLMProviderError):
+        status_code = 502
     return _error_response(request, status_code, exc.code, str(exc))
 
 

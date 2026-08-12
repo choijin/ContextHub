@@ -1,4 +1,4 @@
-"""Hugging Face Inference API LLM provider."""
+"""Hugging Face Inference Providers LLM adapter."""
 
 import time
 from typing import Any
@@ -14,6 +14,7 @@ from contexthub.domain.exceptions import (
     LLMProviderUnavailableError,
 )
 from contexthub.domain.models.generation import GenerationResult
+from contexthub.domain.models.llm import LLMAnswer
 from contexthub.domain.models.prompt import PromptRequest
 from contexthub.observability.timing import Stopwatch
 
@@ -22,6 +23,7 @@ class HuggingFaceLLMProvider:
     """Synchronous Hugging Face adapter behind the LLMProvider port."""
 
     provider_name = "huggingface"
+    _endpoint = "https://router.huggingface.co/v1/chat/completions"
 
     def __init__(
         self,
@@ -53,12 +55,19 @@ class HuggingFaceLLMProvider:
     def generate(self, prompt: PromptRequest) -> GenerationResult:
         stopwatch = Stopwatch()
         payload = {
-            "inputs": self._render_prompt(prompt),
-            "parameters": {
-                "temperature": self._temperature,
-                "max_new_tokens": self._max_output_tokens,
-                "return_full_text": False,
+            "model": self._model_name,
+            "messages": self._render_messages(prompt),
+            "temperature": self._temperature,
+            "max_tokens": self._max_output_tokens,
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "LLMAnswer",
+                    "schema": LLMAnswer.model_json_schema(),
+                    "strict": True,
+                },
             },
+            "stream": False,
         }
         response = self._post_with_retries(payload)
         generated_text = self._extract_generated_text(response)
@@ -78,7 +87,7 @@ class HuggingFaceLLMProvider:
         for attempt in range(attempts):
             try:
                 response = self._client.post(
-                    f"https://api-inference.huggingface.co/models/{self._model_name}",
+                    self._endpoint,
                     headers={"Authorization": f"Bearer {self._api_token}"},
                     json=payload,
                     timeout=self._timeout_seconds,
@@ -120,17 +129,12 @@ class HuggingFaceLLMProvider:
     @classmethod
     def _extract_generated_text(cls, response_json: Any) -> str:
         generated_text: object
-        if isinstance(response_json, list) and response_json:
-            first = response_json[0]
-            if not isinstance(first, dict):
-                raise LLMProviderResponseError("LLM provider response is malformed.")
-            generated_text = first.get("generated_text")
-        elif isinstance(response_json, dict):
-            generated_text = response_json.get("generated_text")
-            if generated_text is None and isinstance(response_json.get("choices"), list):
-                generated_text = cls._extract_choice_text(response_json["choices"])
-        else:
+        if not isinstance(response_json, dict):
             raise LLMProviderResponseError("LLM provider response is malformed.")
+
+        generated_text = response_json.get("generated_text")
+        if generated_text is None and isinstance(response_json.get("choices"), list):
+            generated_text = cls._extract_choice_text(response_json["choices"])
 
         if not isinstance(generated_text, str) or not generated_text.strip():
             raise LLMProviderResponseError("LLM provider response did not include text.")
@@ -149,10 +153,18 @@ class HuggingFaceLLMProvider:
         return first.get("text")
 
     @staticmethod
-    def _render_prompt(prompt: PromptRequest) -> str:
+    def _render_messages(prompt: PromptRequest) -> list[dict[str, str]]:
+        return [
+            {"role": "system", "content": prompt.system_prompt},
+            {"role": "user", "content": HuggingFaceLLMProvider._render_user_message(prompt)},
+        ]
+
+    @staticmethod
+    def _render_user_message(prompt: PromptRequest) -> str:
         context_blocks = [
             (
                 "<CONTEXT_BLOCK>\n"
+                f"source_index: {context.source_index}\n"
                 f"chunk_id: {context.chunk_id}\n"
                 f"document: {context.document_name}\n"
                 f"pages: {context.page_start}-{context.page_end}\n"
@@ -164,7 +176,6 @@ class HuggingFaceLLMProvider:
         ]
         context_text = "\n\n".join(context_blocks) if context_blocks else "No context provided."
         return (
-            f"{prompt.system_prompt}\n\n"
             f"Question:\n{prompt.question}\n\n"
             f"Context:\n{context_text}\n\n"
             "Return only the required JSON object."

@@ -16,6 +16,9 @@ def test_prompt_builder_includes_question_and_retrieved_chunks() -> None:
     assert builder.prompt_version == "grounded_qa_v1"
     assert prompt.question == "What is probability?"
     assert "Do not use outside knowledge" in prompt.system_prompt
+    assert "Do not use Markdown, LaTeX, or raw backslashes" in prompt.system_prompt
+    assert "cited_source_indices" in prompt.system_prompt
+    assert prompt.context[0].source_index == 1
     assert prompt.context[0].chunk_id == "chunk-a"
     assert prompt.context[0].document_name == "stats.pdf"
     assert prompt.context[0].text == "Probability measures uncertainty."
