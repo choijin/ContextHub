@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class PromptContext(BaseModel):
+    source_index: int
     chunk_id: str
     document_name: str
     page_start: int
@@ -15,6 +16,13 @@ class PromptContext(BaseModel):
     def validate_non_blank(cls, value: str) -> str:
         if not value.strip():
             raise ValueError("value must not be blank")
+        return value
+
+    @field_validator("source_index")
+    @classmethod
+    def validate_source_index(cls, value: int) -> int:
+        if value < 1:
+            raise ValueError("source_index must be one-based")
         return value
 
     @model_validator(mode="after")

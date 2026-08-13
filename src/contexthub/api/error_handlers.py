@@ -5,7 +5,19 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from contexthub.api.request_id import get_request_id
-from contexthub.domain.exceptions import ContextHubError, IndexNotLoadedError, InvalidQueryError
+from contexthub.domain.exceptions import (
+    ContextHubError,
+    IndexCompatibilityError,
+    IndexLoadError,
+    IndexNotLoadedError,
+    InvalidQueryError,
+    LLMProviderAuthenticationError,
+    LLMProviderError,
+    LLMProviderRateLimitError,
+    LLMProviderResponseError,
+    LLMProviderTimeoutError,
+    LLMProviderUnavailableError,
+)
 
 
 def _error_response(request: Request, status_code: int, code: str, message: str) -> JSONResponse:
@@ -27,8 +39,20 @@ async def contexthub_error_handler(request: Request, exc: Exception) -> JSONResp
     status_code = 500
     if isinstance(exc, InvalidQueryError):
         status_code = 422
-    if isinstance(exc, IndexNotLoadedError):
+    elif isinstance(
+        exc,
+        IndexNotLoadedError
+        | IndexLoadError
+        | IndexCompatibilityError
+        | LLMProviderUnavailableError
+        | LLMProviderTimeoutError
+        | LLMProviderRateLimitError,
+    ):
         status_code = 503
+    elif isinstance(exc, LLMProviderAuthenticationError):
+        status_code = 500
+    elif isinstance(exc, LLMProviderResponseError | LLMProviderError):
+        status_code = 502
     return _error_response(request, status_code, exc.code, str(exc))
 
 

@@ -13,7 +13,7 @@ from contexthub.api.error_handlers import (
     validation_error_handler,
 )
 from contexthub.api.request_id import RequestIDMiddleware
-from contexthub.api.routers import health, readiness
+from contexthub.api.routers import health, query, readiness
 from contexthub.config.settings import ApplicationSettings, get_settings
 from contexthub.domain.exceptions import ContextHubError
 from contexthub.observability.logging import configure_logging
@@ -49,6 +49,7 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
     app.add_exception_handler(Exception, unhandled_error_handler)
     app.include_router(health.router)
     app.include_router(readiness.router)
+    app.include_router(query.router)
     return app
 
 

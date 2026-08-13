@@ -66,6 +66,9 @@ class RetrievalService:
             chunks = self._document_repository.get_chunks_by_positions(
                 [result.position for result in vector_results]
             )
+            document_filenames = self._document_repository.get_document_filenames(
+                [chunk.document_id for chunk in chunks]
+            )
         except (EmbeddingProviderError, VectorStoreError, RepositoryError) as exc:
             raise InvalidQueryError("Retrieval failed.") from exc
 
@@ -73,7 +76,12 @@ class RetrievalService:
             raise IndexCompatibilityError("Retrieved chunk count does not match vector results.")
 
         retrieved_chunks = [
-            RetrievedChunk(chunk=chunk, score=result.score, rank=result.rank)
+            RetrievedChunk(
+                chunk=chunk,
+                score=result.score,
+                rank=result.rank,
+                document_name=document_filenames[chunk.document_id],
+            )
             for chunk, result in zip(chunks, vector_results, strict=True)
         ]
         retrieval_result = RetrievalResult(

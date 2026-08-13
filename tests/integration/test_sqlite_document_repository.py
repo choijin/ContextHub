@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -34,6 +35,33 @@ def test_sqlite_repository_persists_chunks_in_faiss_position_order(tmp_path: Pat
     assert [chunk.id for chunk in loaded] == ["chunk-b", "chunk-a"]
     assert repository.chunk_count() == 2
     assert repository.faiss_positions() == [0, 1]
+    repository.close()
+
+
+def test_sqlite_repository_supports_reads_from_worker_thread(tmp_path: Path) -> None:
+    database_path = tmp_path / "metadata.db"
+    document_id = uuid4()
+    document = Document(
+        id=document_id,
+        filename="sample.pdf",
+        title=None,
+        checksum_sha256="abc",
+        page_count=1,
+    )
+    repository = SQLiteDocumentRepository(database_path)
+    repository.initialize_schema()
+    repository.replace_all(
+        [document],
+        [_chunk("chunk-a", document_id, 0)],
+        {"chunk-a": 0},
+    )
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        chunk = executor.submit(repository.get_chunks_by_positions, [0]).result()[0]
+        filenames = executor.submit(repository.get_document_filenames, [document_id]).result()
+
+    assert chunk.id == "chunk-a"
+    assert filenames == {document_id: "sample.pdf"}
     repository.close()
 
 

@@ -3,7 +3,8 @@
 ContextHub is a production-oriented retrieval-augmented generation reference
 application. Phase 1 established the runnable FastAPI backend foundation and quality
 tooling. Phase 2 adds the offline PDF indexing pipeline that builds FAISS vectors,
-SQLite metadata, and a manifest.
+SQLite metadata, and a manifest. Phase 3 adds runtime retrieval. Phase 4 adds a
+grounded answer API.
 
 ## Current Phase
 
@@ -27,12 +28,15 @@ Implemented:
 - FAISS `IndexFlatIP` vector store;
 - SQLite document/chunk metadata repository;
 - atomic offline index builder;
-- `scripts/ingest.py`.
+- `scripts/ingest.py`;
+- runtime retrieval service and `scripts/retrieve.py`;
+- grounded prompt builder;
+- Hugging Face LLM provider adapter;
+- trusted citation builder;
+- `POST /v1/query`.
 
 Not implemented yet:
 
-- Hugging Face calls;
-- `POST /v1/query`;
 - Streamlit frontend;
 - Docker and GitHub Actions.
 
@@ -78,6 +82,15 @@ uv run python scripts/retrieve.py "What is conditional probability?" --top-k 3
 ```
 
 This prints ranked chunks, similarity scores, chunk IDs, and source page ranges.
+
+Call the grounded query API after building the index and setting
+`CONTEXTHUB_HUGGINGFACE_MODEL` plus `CONTEXTHUB_HUGGINGFACE_API_TOKEN`:
+
+```bash
+curl -X POST http://127.0.0.1:8000/v1/query \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What is conditional probability?", "top_k": 3}'
+```
 
 Run quality gates:
 

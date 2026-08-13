@@ -3,6 +3,8 @@
 from dataclasses import dataclass, field
 
 from contexthub.application.ports.document_repository import DocumentRepository
+from contexthub.application.ports.llm_provider import LLMProvider
+from contexthub.application.services.query_service import QueryService
 from contexthub.application.services.retrieval_service import RetrievalService
 
 
@@ -22,7 +24,9 @@ class RuntimeContainer:
     initialized: bool = False
     checks: list[ReadinessCheck] = field(default_factory=list)
     retrieval_service: RetrievalService | None = None
+    query_service: QueryService | None = None
     document_repository: DocumentRepository | None = None
+    llm_provider: LLMProvider | None = None
     manifest: object | None = None
 
     @property
@@ -32,3 +36,5 @@ class RuntimeContainer:
     def close(self) -> None:
         if self.document_repository is not None:
             self.document_repository.close()
+        if self.llm_provider is not None and hasattr(self.llm_provider, "close"):
+            self.llm_provider.close()

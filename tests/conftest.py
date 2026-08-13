@@ -10,6 +10,7 @@ from contexthub.main import create_app
 def make_settings(**overrides: object) -> ApplicationSettings:
     values = {
         "allow_start_without_index": True,
+        "huggingface_api_token": "test-token",
         "huggingface_model": "test-model",
     }
     values.update(overrides)

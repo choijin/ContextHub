@@ -51,12 +51,20 @@ class RetrievedChunk(BaseModel):
     chunk: Chunk
     score: float
     rank: int
+    document_name: str
 
     @field_validator("rank")
     @classmethod
     def validate_rank(cls, value: int) -> int:
         if value < 1:
             raise ValueError("rank must be one-based")
+        return value
+
+    @field_validator("document_name")
+    @classmethod
+    def validate_document_name(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("document_name must not be blank")
         return value
 
 

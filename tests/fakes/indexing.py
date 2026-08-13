@@ -5,7 +5,9 @@ from uuid import UUID
 
 from contexthub.domain.models.chunk import Chunk, ChunkingConfig
 from contexthub.domain.models.document import Document, DocumentPage, NormalizedDocument
-from contexthub.domain.models.query import VectorSearchResult
+from contexthub.domain.models.generation import GenerationResult
+from contexthub.domain.models.prompt import PromptRequest
+from contexthub.domain.models.query import RetrievalResult, VectorSearchResult
 
 
 class FakeDocumentParser:
@@ -100,6 +102,10 @@ class InMemoryDocumentRepository:
         by_id = {chunk.id: chunk for chunk in self.chunks}
         return [by_id[reverse[position]] for position in positions]
 
+    def get_document_filenames(self, document_ids: list[UUID]) -> dict[UUID, str]:
+        by_id = {document.id: document.filename for document in self.documents}
+        return {document_id: by_id[document_id] for document_id in document_ids}
+
     def chunk_count(self) -> int:
         return len(self.chunks)
 
@@ -149,3 +155,34 @@ class InMemoryVectorStore:
 
 def small_chunking_config() -> ChunkingConfig:
     return ChunkingConfig(chunk_size=80, chunk_overlap=10)
+
+
+class FakeRetriever:
+    def __init__(self, result: RetrievalResult) -> None:
+        self.result = result
+        self.calls: list[tuple[str, int, float | None]] = []
+
+    def retrieve(
+        self,
+        question: str,
+        top_k: int,
+        similarity_threshold: float | None = None,
+    ) -> RetrievalResult:
+        self.calls.append((question, top_k, similarity_threshold))
+        return self.result
+
+
+class FakeLLMProvider:
+    provider_name = "fake"
+    model_name = "fake-model"
+
+    def __init__(
+        self,
+        text: str = ('{"answerable": true, "answer": "Fake answer.", "cited_source_indices": [1]}'),
+    ) -> None:
+        self.text = text
+        self.calls: list[PromptRequest] = []
+
+    def generate(self, prompt: PromptRequest) -> GenerationResult:
+        self.calls.append(prompt)
+        return GenerationResult(text=self.text, provider=self.provider_name, model=self.model_name)

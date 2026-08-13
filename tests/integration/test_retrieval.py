@@ -54,6 +54,7 @@ def test_saved_index_retrieval_resolves_ranked_chunks_from_sqlite(tmp_path: Path
 
     assert result.chunks[0].chunk.id == "regularization-chunk"
     assert result.chunks[0].rank == 1
+    assert result.chunks[0].document_name == "fixture.pdf"
     assert result.chunks[0].chunk.page_start == 1
     assert result.chunks[1].chunk.id == "probability-chunk"
     runtime_repository.close()
