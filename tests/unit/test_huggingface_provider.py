@@ -38,7 +38,9 @@ def test_huggingface_provider_returns_generation_result() -> None:
                     {
                         "message": {
                             "role": "assistant",
-                            "content": '{"answer":"a","cited_source_indices":[1]}',
+                            "content": (
+                                '{"answerable":true,"answer":"a","cited_source_indices":[1]}'
+                            ),
                         }
                     }
                 ]
@@ -49,7 +51,7 @@ def test_huggingface_provider_returns_generation_result() -> None:
 
     result = provider.generate(_prompt())
 
-    assert result.text == '{"answer":"a","cited_source_indices":[1]}'
+    assert result.text == '{"answerable":true,"answer":"a","cited_source_indices":[1]}'
     assert result.provider == "huggingface"
     assert result.model == "model"
     assert request_count == 1

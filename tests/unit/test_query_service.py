@@ -20,7 +20,8 @@ def test_query_service_returns_fake_llm_answer_with_trusted_citation() -> None:
     retrieved_chunk = _retrieved_chunk("chunk-a", "Probability measures uncertainty.")
     retriever = FakeRetriever(_retrieval_result([retrieved_chunk]))
     llm_provider = FakeLLMProvider(
-        '{"answer": "Probability measures uncertainty.", "cited_source_indices": [1]}'
+        '{"answerable": true, "answer": "Probability measures uncertainty.", '
+        '"cited_source_indices": [1]}'
     )
     service = _service(retriever, llm_provider)
 
@@ -62,7 +63,7 @@ def test_query_service_logs_retrieved_chunk_metadata(caplog: pytest.LogCaptureFi
     caplog.set_level("INFO")
     service = _service(
         FakeRetriever(_retrieval_result([_retrieved_chunk("chunk-a", "source text")])),
-        FakeLLMProvider('{"answer": "answer", "cited_source_indices": [1]}'),
+        FakeLLMProvider('{"answerable": true, "answer": "answer", "cited_source_indices": [1]}'),
     )
 
     answer = service.query(QueryRequest(question="What is probability?"))
@@ -81,7 +82,9 @@ def test_query_service_logs_retrieved_chunk_metadata(caplog: pytest.LogCaptureFi
 def test_query_service_rejects_json_wrapped_in_markdown_fence() -> None:
     service = _service(
         FakeRetriever(_retrieval_result([_retrieved_chunk("chunk-a", "text")])),
-        FakeLLMProvider('```json\n{"answer": "answer", "cited_source_indices": [1]}\n```'),
+        FakeLLMProvider(
+            '```json\n{"answerable": true, "answer": "answer", "cited_source_indices": [1]}\n```'
+        ),
     )
 
     with pytest.raises(LLMProviderResponseError):
@@ -104,11 +107,28 @@ def test_query_service_rejects_json_with_raw_latex_backslashes() -> None:
 def test_query_service_unknown_source_index_fails_safely() -> None:
     service = _service(
         FakeRetriever(_retrieval_result([_retrieved_chunk("chunk-a", "text")])),
-        FakeLLMProvider('{"answer": "answer", "cited_source_indices": [2]}'),
+        FakeLLMProvider('{"answerable": true, "answer": "answer", "cited_source_indices": [2]}'),
     )
 
     with pytest.raises(CitationValidationError):
         service.query(QueryRequest(question="What is probability?"))
+
+
+def test_query_service_llm_unanswerable_returns_insufficient_context() -> None:
+    llm_provider = FakeLLMProvider(
+        '{"answerable": false, "answer": "", "cited_source_indices": []}'
+    )
+    service = _service(
+        FakeRetriever(_retrieval_result([_retrieved_chunk("chunk-a", "text")])),
+        llm_provider,
+    )
+
+    answer = service.query(QueryRequest(question="What is the capital of South Korea?"))
+
+    assert answer.status is AnswerStatus.INSUFFICIENT_CONTEXT
+    assert answer.answer == INSUFFICIENT_CONTEXT_ANSWER
+    assert answer.citations == []
+    assert len(llm_provider.calls) == 1
 
 
 def test_query_service_empty_retrieval_abstains_without_calling_llm() -> None:

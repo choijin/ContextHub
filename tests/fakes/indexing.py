@@ -178,7 +178,7 @@ class FakeLLMProvider:
 
     def __init__(
         self,
-        text: str = '{"answer": "Fake answer.", "cited_source_indices": [1]}',
+        text: str = ('{"answerable": true, "answer": "Fake answer.", "cited_source_indices": [1]}'),
     ) -> None:
         self.text = text
         self.calls: list[PromptRequest] = []

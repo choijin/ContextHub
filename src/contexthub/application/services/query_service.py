@@ -65,6 +65,16 @@ class QueryService:
         self._log_prompt_context(retrieval_result, prompt)
         generation = self._llm_provider.generate(prompt)
         llm_answer = self._parse_generation(generation.text, self._logger)
+        if not llm_answer.answerable:
+            self._log_completed(retrieval_result, AnswerStatus.INSUFFICIENT_CONTEXT, stopwatch)
+            return Answer(
+                request_id=retrieval_result.request_id,
+                question=request.question,
+                answer=INSUFFICIENT_CONTEXT_ANSWER,
+                status=AnswerStatus.INSUFFICIENT_CONTEXT,
+                citations=[],
+            )
+
         citation_ids = self._source_indices_to_chunk_ids(
             llm_answer.cited_source_indices,
             prompt,
@@ -77,7 +87,7 @@ class QueryService:
         answer = Answer(
             request_id=retrieval_result.request_id,
             question=request.question,
-            answer=llm_answer.answer,
+            answer=llm_answer.answer or INSUFFICIENT_CONTEXT_ANSWER,
             status=AnswerStatus.ANSWERED,
             citations=citations,
         )

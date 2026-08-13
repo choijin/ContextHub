@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 from contexthub.domain.models.chunk import Chunk, ChunkingConfig
 from contexthub.domain.models.document import DocumentPage, NormalizedDocument
+from contexthub.domain.models.llm import LLMAnswer
 
 
 def test_document_pages_are_one_based() -> None:
@@ -39,3 +40,33 @@ def test_chunk_rejects_invalid_page_range() -> None:
             page_end=1,
             content_hash="hash",
         )
+
+
+def test_llm_answer_requires_answer_and_citation_when_answerable() -> None:
+    answer = LLMAnswer(
+        answerable=True,
+        answer=" grounded answer ",
+        cited_source_indices=[1],
+    )
+
+    assert answer.answer == "grounded answer"
+
+
+def test_llm_answer_allows_unanswerable_without_citations() -> None:
+    answer = LLMAnswer(
+        answerable=False,
+        answer="",
+        cited_source_indices=[],
+    )
+
+    assert answer.answerable is False
+
+
+def test_llm_answer_rejects_answerable_without_citations() -> None:
+    with pytest.raises(ValidationError, match="at least one citation"):
+        LLMAnswer(answerable=True, answer="answer", cited_source_indices=[])
+
+
+def test_llm_answer_rejects_unanswerable_with_citations() -> None:
+    with pytest.raises(ValidationError, match="must not cite"):
+        LLMAnswer(answerable=False, answer="", cited_source_indices=[1])

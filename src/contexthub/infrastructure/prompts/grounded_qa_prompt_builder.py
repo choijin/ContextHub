@@ -14,9 +14,13 @@ Rules:
 5. Cite only source_index values included in the context.
 6. Write the answer in plain text. Do not use Markdown, LaTeX, or raw backslashes.
 7. Do not generate document names, page numbers, excerpts, or other source metadata.
+8. Set answerable to false when the context does not contain enough evidence.
 
 Required JSON schema:
-{"answer": "Answer grounded in the supplied context.", "cited_source_indices": [1]}"""
+{"answerable": true, "answer": "Answer grounded in context.", "cited_source_indices": [1]}
+
+When the context is insufficient, return:
+{"answerable": false, "answer": "", "cited_source_indices": []}"""
 
 
 class GroundedQAPromptBuilder:
