@@ -14,4 +14,5 @@ class RetrievalStrategy(StrEnum):
 class AnswerStatus(StrEnum):
     ANSWERED = "answered"
     INSUFFICIENT_CONTEXT = "insufficient_context"
+    REFUSED = "refused"
     PROVIDER_ERROR = "provider_error"

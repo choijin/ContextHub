@@ -1,6 +1,7 @@
 """Grounded query orchestration service."""
 
 import logging
+from uuid import UUID, uuid4
 
 from pydantic import ValidationError
 
@@ -8,6 +9,15 @@ from contexthub.application.ports.llm_provider import LLMProvider
 from contexthub.application.ports.prompt_builder import PromptBuilder
 from contexthub.application.ports.retriever import Retriever
 from contexthub.application.services.citation_builder import CitationBuilder
+from contexthub.application.services.query_guardrail import (
+    PROMPT_INJECTION_REFUSAL,
+    QueryGuardrail,
+)
+from contexthub.application.services.sensitive_data_guardrail import (
+    SENSITIVE_DATA_REFUSAL,
+    SensitiveDataGuardrail,
+    SensitiveDataGuardrailResult,
+)
 from contexthub.config.settings import ApplicationSettings
 from contexthub.domain.enums import AnswerStatus
 from contexthub.domain.exceptions import CitationValidationError, LLMProviderResponseError
@@ -34,6 +44,8 @@ class QueryService:
         llm_provider: LLMProvider,
         citation_builder: CitationBuilder,
         settings: ApplicationSettings,
+        query_guardrail: QueryGuardrail | None = None,
+        sensitive_data_guardrail: SensitiveDataGuardrail | None = None,
         logger: logging.Logger | None = None,
     ) -> None:
         self._retriever = retriever
@@ -41,10 +53,34 @@ class QueryService:
         self._llm_provider = llm_provider
         self._citation_builder = citation_builder
         self._settings = settings
+        self._query_guardrail = query_guardrail or QueryGuardrail()
+        self._sensitive_data_guardrail = sensitive_data_guardrail or SensitiveDataGuardrail()
         self._logger = logger or logging.getLogger(__name__)
 
     def query(self, request: QueryRequest) -> Answer:
         stopwatch = Stopwatch()
+        guardrail_result = self._query_guardrail.inspect(request.question)
+        if guardrail_result.blocked:
+            request_id = uuid4()
+            self._logger.warning(
+                "query_guardrail_blocked",
+                extra={
+                    "extra_fields": {
+                        "request_id": str(request_id),
+                        "reason": guardrail_result.reason,
+                        "matched_pattern": guardrail_result.matched_pattern,
+                        "duration_ms": stopwatch.elapsed_ms,
+                    }
+                },
+            )
+            return Answer(
+                request_id=request_id,
+                question=request.question,
+                answer=PROMPT_INJECTION_REFUSAL,
+                status=AnswerStatus.REFUSED,
+                citations=[],
+            )
+
         retrieval_result = self._retriever.retrieve(
             question=request.question,
             top_k=request.top_k,
@@ -60,6 +96,19 @@ class QueryService:
                 status=AnswerStatus.INSUFFICIENT_CONTEXT,
                 citations=[],
             )
+        context_guardrail_result = self._inspect_retrieved_sensitive_data(retrieval_result)
+        if context_guardrail_result.blocked:
+            self._log_sensitive_data_block(
+                retrieval_result,
+                location="retrieved_context",
+                categories=[finding.category for finding in context_guardrail_result.findings],
+                stopwatch=stopwatch,
+            )
+            return self._refused_answer(
+                request_id=retrieval_result.request_id,
+                question=request.question,
+                answer=SENSITIVE_DATA_REFUSAL,
+            )
 
         prompt = self._prompt_builder.build(request.question, retrieval_result.chunks)
         self._log_prompt_context(retrieval_result, prompt)
@@ -73,6 +122,19 @@ class QueryService:
                 answer=INSUFFICIENT_CONTEXT_ANSWER,
                 status=AnswerStatus.INSUFFICIENT_CONTEXT,
                 citations=[],
+            )
+        answer_guardrail_result = self._sensitive_data_guardrail.inspect_text(llm_answer.answer)
+        if answer_guardrail_result.blocked:
+            self._log_sensitive_data_block(
+                retrieval_result,
+                location="llm_answer",
+                categories=[finding.category for finding in answer_guardrail_result.findings],
+                stopwatch=stopwatch,
+            )
+            return self._refused_answer(
+                request_id=retrieval_result.request_id,
+                question=request.question,
+                answer=SENSITIVE_DATA_REFUSAL,
             )
 
         citation_ids = self._source_indices_to_chunk_ids(
@@ -93,6 +155,23 @@ class QueryService:
         )
         self._log_completed(retrieval_result, answer.status, stopwatch)
         return answer
+
+    def _inspect_retrieved_sensitive_data(
+        self,
+        retrieval_result: RetrievalResult,
+    ) -> SensitiveDataGuardrailResult:
+        combined_context = "\n".join(retrieved.chunk.text for retrieved in retrieval_result.chunks)
+        return self._sensitive_data_guardrail.inspect_text(combined_context)
+
+    @staticmethod
+    def _refused_answer(request_id: UUID, question: str, answer: str) -> Answer:
+        return Answer(
+            request_id=request_id,
+            question=question,
+            answer=answer,
+            status=AnswerStatus.REFUSED,
+            citations=[],
+        )
 
     def _has_insufficient_context(self, retrieval_result: RetrievalResult) -> bool:
         if not retrieval_result.chunks:
@@ -182,6 +261,25 @@ class QueryService:
                     "context_block_count": len(prompt.context),
                     "context_chunk_ids": [context.chunk_id for context in prompt.context],
                     "context_source_indices": [context.source_index for context in prompt.context],
+                }
+            },
+        )
+
+    def _log_sensitive_data_block(
+        self,
+        retrieval_result: RetrievalResult,
+        location: str,
+        categories: list[str],
+        stopwatch: Stopwatch,
+    ) -> None:
+        self._logger.warning(
+            "sensitive_data_guardrail_blocked",
+            extra={
+                "extra_fields": {
+                    "request_id": str(retrieval_result.request_id),
+                    "location": location,
+                    "categories": sorted(set(categories)),
+                    "duration_ms": stopwatch.elapsed_ms,
                 }
             },
         )
