@@ -16,6 +16,11 @@ def test_prompt_builder_includes_question_and_retrieved_chunks() -> None:
     assert builder.prompt_version == "grounded_qa_v1"
     assert prompt.question == "What is probability?"
     assert "Do not use outside knowledge" in prompt.system_prompt
+    assert "source_index is only the explicit source_index label" in prompt.system_prompt
+    assert "Do not use page numbers, equation numbers" in prompt.system_prompt
+    assert "If none of the shown source_index values directly support the answer" in (
+        prompt.system_prompt
+    )
     assert "Do not use Markdown, LaTeX, or raw backslashes" in prompt.system_prompt
     assert "answerable" in prompt.system_prompt
     assert '"answerable": false, "answer": ""' in prompt.system_prompt

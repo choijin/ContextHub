@@ -10,7 +10,7 @@ from contexthub.application.ports.retriever import Retriever
 from contexthub.application.services.citation_builder import CitationBuilder
 from contexthub.config.settings import ApplicationSettings
 from contexthub.domain.enums import AnswerStatus
-from contexthub.domain.exceptions import CitationValidationError, LLMProviderResponseError
+from contexthub.domain.exceptions import LLMProviderResponseError
 from contexthub.domain.models.answer import Answer
 from contexthub.domain.models.llm import LLMAnswer
 from contexthub.domain.models.prompt import PromptRequest
@@ -80,9 +80,28 @@ class QueryService:
             prompt,
             retrieval_result,
         )
+        if not citation_ids:
+            citation_ids = self._prompt_context_chunk_ids(prompt, retrieval_result)
+            self._logger.info(
+                "query_citations_fell_back_to_prompt_context",
+                extra={
+                    "extra_fields": {
+                        "request_id": str(retrieval_result.request_id),
+                        "citation_count": len(citation_ids),
+                    }
+                },
+            )
+
         citations = self._citation_builder.build(citation_ids, retrieval_result.chunks)
         if not citations:
-            raise CitationValidationError("Answered response must include at least one citation.")
+            self._log_completed(retrieval_result, AnswerStatus.INSUFFICIENT_CONTEXT, stopwatch)
+            return Answer(
+                request_id=retrieval_result.request_id,
+                question=request.question,
+                answer=INSUFFICIENT_CONTEXT_ANSWER,
+                status=AnswerStatus.INSUFFICIENT_CONTEXT,
+                citations=[],
+            )
 
         answer = Answer(
             request_id=retrieval_result.request_id,
@@ -112,27 +131,66 @@ class QueryService:
                 "LLM provider returned invalid structured output."
             ) from exc
 
-    @staticmethod
     def _source_indices_to_chunk_ids(
+        self,
         cited_source_indices: list[int],
         prompt: PromptRequest,
         retrieval_result: RetrievalResult,
     ) -> list[str]:
         prompt_context_by_index = {context.source_index: context for context in prompt.context}
+        retrieved_chunk_ids = {retrieved.chunk.id for retrieved in retrieval_result.chunks}
         chunk_ids: list[str] = []
         seen: set[int] = set()
+        ignored_source_indices: list[int] = []
         for source_index in cited_source_indices:
             if source_index in seen:
                 continue
             context = prompt_context_by_index.get(source_index)
             if context is None:
-                raise CitationValidationError("LLM returned an unknown source index.")
+                ignored_source_indices.append(source_index)
+                seen.add(source_index)
+                continue
             seen.add(source_index)
+            if context.chunk_id not in retrieved_chunk_ids:
+                ignored_source_indices.append(source_index)
+                continue
             chunk_ids.append(context.chunk_id)
 
+        if ignored_source_indices:
+            self._logger.warning(
+                "llm_citation_indices_ignored",
+                extra={
+                    "extra_fields": {
+                        "request_id": str(retrieval_result.request_id),
+                        "returned_source_indices": cited_source_indices,
+                        "valid_source_indices": [
+                            source_index
+                            for source_index, context in prompt_context_by_index.items()
+                            if context.chunk_id in chunk_ids
+                        ],
+                        "ignored_source_indices": ignored_source_indices,
+                        "allowed_source_indices": sorted(prompt_context_by_index),
+                    }
+                },
+            )
+        return chunk_ids
+
+    @staticmethod
+    def _prompt_context_chunk_ids(
+        prompt: PromptRequest,
+        retrieval_result: RetrievalResult,
+    ) -> list[str]:
         retrieved_chunk_ids = {retrieved.chunk.id for retrieved in retrieval_result.chunks}
-        if any(chunk_id not in retrieved_chunk_ids for chunk_id in chunk_ids):
-            raise CitationValidationError("LLM cited a source outside retrieved context.")
+        chunk_ids: list[str] = []
+        seen: set[str] = set()
+        for context in sorted(
+            prompt.context,
+            key=lambda prompt_context: prompt_context.source_index,
+        ):
+            if context.chunk_id in seen or context.chunk_id not in retrieved_chunk_ids:
+                continue
+            seen.add(context.chunk_id)
+            chunk_ids.append(context.chunk_id)
         return chunk_ids
 
     @staticmethod
