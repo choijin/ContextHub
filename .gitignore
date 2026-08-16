@@ -20,3 +20,7 @@ data/pdfs/*
 !data/pdfs/sample.pdf
 data/evaluation/*
 !data/evaluation/.gitkeep
+!data/evaluation/evaluation_questions.jsonl
+!data/evaluation/reports/
+data/evaluation/reports/*
+!data/evaluation/reports/.gitkeep
