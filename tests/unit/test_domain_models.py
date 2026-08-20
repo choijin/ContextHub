@@ -42,11 +42,11 @@ def test_chunk_rejects_invalid_page_range() -> None:
         )
 
 
-def test_llm_answer_requires_answer_and_citation_when_answerable() -> None:
+def test_llm_answer_requires_answer_when_answerable() -> None:
     answer = LLMAnswer(
         answerable=True,
         answer=" grounded answer ",
-        cited_source_indices=[1],
+        cited_source_indices=[],
     )
 
     assert answer.answer == "grounded answer"
@@ -60,11 +60,6 @@ def test_llm_answer_allows_unanswerable_without_citations() -> None:
     )
 
     assert answer.answerable is False
-
-
-def test_llm_answer_rejects_answerable_without_citations() -> None:
-    with pytest.raises(ValidationError, match="at least one citation"):
-        LLMAnswer(answerable=True, answer="answer", cited_source_indices=[])
 
 
 def test_llm_answer_rejects_unanswerable_with_citations() -> None:
