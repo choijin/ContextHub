@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from collections.abc import MutableMapping
 from typing import Any
 
 import httpx
@@ -12,6 +13,16 @@ DEFAULT_API_BASE_URL = "http://127.0.0.1:8000"
 API_BASE_URL_ENV = "CONTEXTHUB_API_BASE_URL"
 REQUEST_TIMEOUT_SECONDS = 30.0
 DEFAULT_TOP_K = 5
+API_BASE_URL_STATE_KEY = "api_base_url"
+QUESTION_STATE_KEY = "question"
+LAST_RESPONSE_STATE_KEY = "last_response"
+LAST_ERROR_STATE_KEY = "last_error"
+
+SAMPLE_QUESTIONS = (
+    "What is conditional probability?",
+    "What is maximum likelihood estimation?",
+    "How does the document define a probability space?",
+)
 
 
 def normalize_api_base_url(value: str | None) -> str:
@@ -59,6 +70,25 @@ def citation_heading(citation: dict[str, Any], index: int) -> str:
     else:
         page_label = "pages unavailable"
     return f"Source {index}: {document_name}, {page_label}"
+
+
+def initialize_session_state(
+    state: MutableMapping[str, Any],
+    default_api_base_url: str,
+) -> None:
+    state.setdefault(API_BASE_URL_STATE_KEY, default_api_base_url)
+    state.setdefault(QUESTION_STATE_KEY, "")
+    state.setdefault(LAST_RESPONSE_STATE_KEY, None)
+    state.setdefault(LAST_ERROR_STATE_KEY, None)
+
+
+def store_query_result(
+    state: MutableMapping[str, Any],
+    payload: dict[str, Any] | None,
+    error: str | None,
+) -> None:
+    state[LAST_RESPONSE_STATE_KEY] = payload
+    state[LAST_ERROR_STATE_KEY] = error
 
 
 def fetch_readiness(api_base_url: str) -> tuple[dict[str, Any] | None, str | None]:
@@ -171,7 +201,8 @@ def render_readiness(api_base_url: str) -> None:
 def main() -> None:
     st.set_page_config(page_title="ContextHub", layout="centered")
 
-    api_base_url = normalize_api_base_url(os.getenv(API_BASE_URL_ENV))
+    default_api_base_url = normalize_api_base_url(os.getenv(API_BASE_URL_ENV))
+    initialize_session_state(st.session_state, default_api_base_url)
 
     st.title("ContextHub")
     st.caption("Production-oriented retrieval-augmented generation reference application.")
@@ -183,7 +214,7 @@ def main() -> None:
 
     st.sidebar.header("API")
     api_base_url = normalize_api_base_url(
-        st.sidebar.text_input("FastAPI base URL", value=api_base_url)
+        st.sidebar.text_input("FastAPI base URL", key=API_BASE_URL_STATE_KEY)
     )
     render_readiness(api_base_url)
 
@@ -192,28 +223,35 @@ def main() -> None:
             "Question",
             placeholder="What is conditional probability?",
             height=120,
+            key=QUESTION_STATE_KEY,
         )
         submitted = st.form_submit_button("Submit")
 
-    if not submitted:
-        return
+    with st.expander("Sample questions", expanded=False):
+        for sample_question in SAMPLE_QUESTIONS:
+            st.write(sample_question)
 
-    normalized_question = question.strip()
-    if not normalized_question:
-        st.error("Enter a question before submitting.")
-        return
+    if submitted:
+        normalized_question = question.strip()
+        if not normalized_question:
+            store_query_result(st.session_state, None, "Enter a question before submitting.")
+        else:
+            with st.spinner("Querying ContextHub..."):
+                payload, error = submit_question(
+                    api_base_url,
+                    normalized_question,
+                    DEFAULT_TOP_K,
+                )
+            if payload is None and error is None:
+                error = "The API did not return a response."
+            store_query_result(st.session_state, payload, error)
 
-    with st.spinner("Querying ContextHub..."):
-        payload, error = submit_question(api_base_url, normalized_question, DEFAULT_TOP_K)
-
-    if error:
-        st.error(error)
-        return
-    if payload is None:
-        st.error("The API did not return a response.")
-        return
-
-    render_answer(payload)
+    stored_error = st.session_state[LAST_ERROR_STATE_KEY]
+    stored_payload = st.session_state[LAST_RESPONSE_STATE_KEY]
+    if isinstance(stored_error, str) and stored_error:
+        st.error(stored_error)
+    elif isinstance(stored_payload, dict):
+        render_answer(stored_payload)
 
 
 if __name__ == "__main__":

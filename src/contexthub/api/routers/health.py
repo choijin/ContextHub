@@ -9,7 +9,12 @@ from contexthub.config.settings import ApplicationSettings
 router = APIRouter(tags=["health"])
 
 
-@router.get("/health", response_model=HealthResponse)
+@router.get(
+    "/health",
+    response_model=HealthResponse,
+    summary="Check process health",
+    description="Confirms that the FastAPI process is running without calling providers.",
+)
 def health(request: Request) -> HealthResponse:
     settings: ApplicationSettings = request.app.state.settings
     return HealthResponse(

@@ -18,6 +18,28 @@ from contexthub.config.settings import ApplicationSettings, get_settings
 from contexthub.domain.exceptions import ContextHubError
 from contexthub.observability.logging import configure_logging
 
+APP_DESCRIPTION = """ContextHub is a production-oriented retrieval-augmented generation API.
+
+Use the health and readiness endpoints to inspect runtime state, then submit grounded
+questions to the query endpoint. Answers are generated only from the indexed document
+context and include application-validated citations.
+"""
+
+OPENAPI_TAGS = [
+    {
+        "name": "health",
+        "description": "Process health checks that do not call external providers.",
+    },
+    {
+        "name": "readiness",
+        "description": "Runtime dependency and index compatibility checks.",
+    },
+    {
+        "name": "query",
+        "description": "Grounded document questions with trusted citations.",
+    },
+]
+
 
 def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
     """Create a configured FastAPI app for production or tests."""
@@ -40,6 +62,11 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
     app = FastAPI(
         title=resolved_settings.app_name,
         version=resolved_settings.app_version,
+        description=APP_DESCRIPTION,
+        openapi_tags=OPENAPI_TAGS,
+        docs_url="/docs",
+        redoc_url="/redoc",
+        openapi_url="/openapi.json",
         lifespan=lifespan,
     )
     app.state.settings = resolved_settings
