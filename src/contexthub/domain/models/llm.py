@@ -38,8 +38,6 @@ class LLMAnswer(BaseModel):
         if self.answerable:
             if not self.answer:
                 raise ValueError("answerable responses require an answer")
-            if not self.cited_source_indices:
-                raise ValueError("answerable responses require at least one citation")
         else:
             if self.cited_source_indices:
                 raise ValueError("unanswerable responses must not cite sources")

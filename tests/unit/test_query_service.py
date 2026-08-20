@@ -9,7 +9,7 @@ from contexthub.application.services.query_service import (
 )
 from contexthub.config.settings import ApplicationSettings
 from contexthub.domain.enums import AnswerStatus
-from contexthub.domain.exceptions import CitationValidationError, LLMProviderResponseError
+from contexthub.domain.exceptions import LLMProviderResponseError
 from contexthub.domain.models.chunk import Chunk
 from contexthub.domain.models.query import QueryRequest, RetrievalResult, RetrievedChunk
 from contexthub.infrastructure.prompts.grounded_qa_prompt_builder import GroundedQAPromptBuilder
@@ -104,14 +104,69 @@ def test_query_service_rejects_json_with_raw_latex_backslashes() -> None:
         service.query(QueryRequest(question="What is probability?"))
 
 
-def test_query_service_unknown_source_index_fails_safely() -> None:
+def test_query_service_unknown_source_index_falls_back_to_prompt_context(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level("INFO")
     service = _service(
         FakeRetriever(_retrieval_result([_retrieved_chunk("chunk-a", "text")])),
         FakeLLMProvider('{"answerable": true, "answer": "answer", "cited_source_indices": [2]}'),
     )
 
-    with pytest.raises(CitationValidationError):
-        service.query(QueryRequest(question="What is probability?"))
+    answer = service.query(QueryRequest(question="What is probability?"))
+
+    assert answer.status is AnswerStatus.ANSWERED
+    assert answer.answer == "answer"
+    assert [citation.chunk_id for citation in answer.citations] == ["chunk-a"]
+    record = next(
+        record
+        for record in caplog.records
+        if record.message == "query_citations_fell_back_to_prompt_context"
+    )
+    assert record.extra_fields["citation_count"] == 1
+
+
+def test_query_service_ignores_unknown_source_indices_when_valid_citations_remain(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level("WARNING")
+    service = _service(
+        FakeRetriever(_retrieval_result([_retrieved_chunk("chunk-a", "text")])),
+        FakeLLMProvider(
+            '{"answerable": true, "answer": "answer", "cited_source_indices": [1, 99]}'
+        ),
+    )
+
+    answer = service.query(QueryRequest(question="What is probability?"))
+
+    assert answer.status is AnswerStatus.ANSWERED
+    assert [citation.chunk_id for citation in answer.citations] == ["chunk-a"]
+    record = next(
+        record for record in caplog.records if record.message == "llm_citation_indices_ignored"
+    )
+    assert record.extra_fields["returned_source_indices"] == [1, 99]
+    assert record.extra_fields["valid_source_indices"] == [1]
+    assert record.extra_fields["ignored_source_indices"] == [99]
+    assert record.extra_fields["allowed_source_indices"] == [1]
+
+
+def test_query_service_empty_llm_citations_fall_back_to_prompt_context() -> None:
+    service = _service(
+        FakeRetriever(
+            _retrieval_result(
+                [
+                    _retrieved_chunk("chunk-a", "alpha"),
+                    _retrieved_chunk("chunk-b", "beta"),
+                ]
+            )
+        ),
+        FakeLLMProvider('{"answerable": true, "answer": "answer", "cited_source_indices": []}'),
+    )
+
+    answer = service.query(QueryRequest(question="What is probability?"))
+
+    assert answer.status is AnswerStatus.ANSWERED
+    assert [citation.chunk_id for citation in answer.citations] == ["chunk-a", "chunk-b"]
 
 
 def test_query_service_llm_unanswerable_returns_insufficient_context() -> None:
