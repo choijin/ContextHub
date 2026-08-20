@@ -11,7 +11,16 @@ from contexthub.config.settings import ApplicationSettings
 router = APIRouter(tags=["readiness"])
 
 
-@router.get("/ready", response_model=ReadinessResponse)
+@router.get(
+    "/ready",
+    response_model=ReadinessResponse,
+    summary="Check runtime readiness",
+    description=(
+        "Reports index, embedding, metadata, retrieval, and LLM configuration readiness "
+        "without sending an LLM generation request."
+    ),
+    responses={503: {"model": ReadinessResponse, "description": "Runtime is not ready."}},
+)
 def ready(request: Request) -> ReadinessResponse | JSONResponse:
     settings: ApplicationSettings = request.app.state.settings
     runtime: RuntimeContainer | None = getattr(request.app.state, "runtime_container", None)
