@@ -173,8 +173,14 @@ docker compose down
 ```
 
 The raw PDF, local `.env`, virtual environments, tests, and development caches are
-excluded from the image. The bundled index is derived from the attributed CC BY 4.0
-demonstration corpus. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+excluded from the image.
+
+The bundled index is derived from *Loss Data Analytics, Second Edition*, Version 2.0
+(October 2024), edited by Hélène Cossette, Edward (Jed) Frees, Brian Hartman, and Tim
+Higgins. The source is <https://openacttexts.github.io/LDAVer2/> and is licensed under
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). ContextHub transforms the
+work by extracting, chunking, embedding, and indexing its text; the original editors
+do not endorse this application.
 
 ## API
 
@@ -248,7 +254,5 @@ the index, embedding compatibility, metadata mapping, or LLM configuration.
 
 ## Project Status
 
-Phases 1 through 7 are implemented: backend foundation, offline indexing, runtime
-retrieval, grounded query API, retrieval evaluation, Streamlit client, and integrated
-local application hardening. Docker, GitHub Actions, and public deployment belong to
-Phase 8 and are intentionally not implemented here.
+Phases 1 through 7 and the Docker portion of Phase 8 are implemented. GitHub Actions
+and public deployment remain Phase 8 work.

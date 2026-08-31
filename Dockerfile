@@ -24,7 +24,6 @@ COPY src ./src
 RUN uv sync --frozen --no-dev --no-editable
 
 COPY frontend ./frontend
-COPY THIRD_PARTY_NOTICES.md ./
 COPY data/index ./data/index
 
 RUN mkdir -p "$HF_HOME" \
