@@ -15,7 +15,10 @@ router = APIRouter(tags=["query"])
 QUERY_EXAMPLES = {
     "answerable": {
         "summary": "Question supported by the indexed corpus",
-        "value": {"question": "What is conditional probability?", "top_k": 5},
+        "value": {
+            "question": "How does a policy deductible affect claim payments?",
+            "top_k": 5,
+        },
     },
     "unanswerable": {
         "summary": "Question outside the indexed corpus",
@@ -25,16 +28,19 @@ QUERY_EXAMPLES = {
 
 ANSWERED_RESPONSE_EXAMPLE = {
     "request_id": "2ddc67de-93d3-4c9e-93e2-267e9f107d46",
-    "question": "What is conditional probability?",
-    "answer": "Conditional probability updates probability using known information.",
+    "question": "How does a policy deductible affect claim payments?",
+    "answer": (
+        "A policy deductible reduces the insurer's payment by requiring the policyholder "
+        "to absorb losses up to the deductible amount."
+    ),
     "status": "answered",
     "citations": [
         {
-            "chunk_id": "7b7eade7-83a2-5e58-9b9d-594f24462c18",
-            "document_name": "probability.pdf",
-            "page_start": 10,
-            "page_end": 10,
-            "excerpt": "Conditional probability incorporates known information.",
+            "chunk_id": "example-chunk-id",
+            "document_name": "loss_data_analytics_2nd_ed.pdf",
+            "page_start": 170,
+            "page_end": 171,
+            "excerpt": "A deductible modifies the amount paid by the insurer for a covered loss.",
         }
     ],
 }

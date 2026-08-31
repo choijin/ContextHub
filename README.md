@@ -115,18 +115,66 @@ shows `API ready`, submit a question. An answered response displays trusted sour
 cards; a question unsupported by the corpus displays an explicit abstention. The most
 recent response or recoverable error remains visible across ordinary Streamlit reruns.
 
-Known questions for the current probability and statistics corpus include:
+Known questions for the current loss data analytics corpus include:
 
-- `What is conditional probability?`
-- `What is maximum likelihood estimation?`
-- `How does the document define a probability space?`
-- `How do conditional probability and the law of total probability relate in the rain and lateness example?`
+- `What is the difference between claim frequency and claim severity?`
+- `How does a policy deductible affect claim payments?`
+- `Why is the normal distribution often inappropriate for insurance loss data?`
+- `How do deductibles affect both claim severity and claim frequency?`
 
 An unanswerable control question is:
 
 - `What is the capital of South Korea?`
 
 Expected behavior is `insufficient_context` with no citations.
+
+## Docker
+
+The image includes the fixed-corpus FAISS index, SQLite metadata database, and manifest.
+Docker never runs ingestion automatically. Rebuild the artifacts before rebuilding the
+image only when the corpus or indexing configuration changes:
+
+```bash
+uv run python scripts/ingest.py
+```
+
+Create `.env` from `.env.example` and set valid Hugging Face values:
+
+```text
+CONTEXTHUB_HUGGINGFACE_MODEL=your-provider-model
+CONTEXTHUB_HUGGINGFACE_API_TOKEN=your-token
+```
+
+Build and start the FastAPI and Streamlit services:
+
+```bash
+docker compose up --build
+```
+
+Open <http://127.0.0.1:8501>. FastAPI remains available at
+<http://127.0.0.1:8000>, including its `/health`, `/ready`, and `/docs` routes.
+If either host port is already occupied, override it while leaving the container ports
+unchanged:
+
+```bash
+CONTEXTHUB_API_PORT=8001 CONTEXTHUB_UI_PORT=8502 docker compose up --build
+```
+
+Compose starts two containers from the same image. The `api` service reads the bundled
+index from `/app/data/index` and starts Uvicorn. The non-root runtime user cannot modify
+the root-owned index artifacts. The `ui` service starts Streamlit and reaches FastAPI
+over the private Compose network at `http://api:8000`. A named volume preserves the
+downloaded embedding model between container recreations.
+
+Stop the application with:
+
+```bash
+docker compose down
+```
+
+The raw PDF, local `.env`, virtual environments, tests, and development caches are
+excluded from the image. The bundled index is derived from the attributed CC BY 4.0
+demonstration corpus. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## API
 
@@ -144,7 +192,7 @@ Submit a query directly:
 curl -X POST http://127.0.0.1:8000/v1/query \
   -H "Content-Type: application/json" \
   -H "X-Request-ID: local-demo" \
-  -d '{"question": "What is conditional probability?", "top_k": 5}'
+  -d '{"question": "How does a policy deductible affect claim payments?", "top_k": 5}'
 ```
 
 Every HTTP response includes `X-Request-ID`. Request logs include the same identifier,
@@ -164,7 +212,7 @@ Versioned JSON reports are written under `data/evaluation/reports/`.
 Inspect retrieval independently of generation:
 
 ```bash
-uv run python scripts/retrieve.py "What is conditional probability?" --top-k 5
+uv run python scripts/retrieve.py "What is loss data analytics?" --top-k 5
 ```
 
 ## Verification
