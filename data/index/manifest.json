@@ -1,0 +1,19 @@
+{
+  "application_version": "1.0.0",
+  "built_at": "2026-08-30T23:32:02.014796+00:00",
+  "chunk_count": 1477,
+  "chunk_overlap": 150,
+  "chunk_size": 1000,
+  "document_count": 1,
+  "embedding_dimensions": 384,
+  "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+  "embedding_provider": "sentence_transformers",
+  "schema_version": "1.0",
+  "source_documents": [
+    {
+      "checksum_sha256": "d43ce6fe8e86727081043fee0f01894f614640a8ae9e9533c1ee902166a668ad",
+      "relative_path": "loss_data_analytics_2nd_ed.pdf"
+    }
+  ],
+  "vector_index_type": "IndexFlatIP"
+}
