@@ -14,10 +14,13 @@ def test_openapi_documents_operational_and_query_routes() -> None:
     query_operation = schema["paths"]["/v1/query"]["post"]
     assert query_operation["summary"] == "Ask a grounded document question"
     examples = query_operation["requestBody"]["content"]["application/json"]["examples"]
-    assert examples["answerable"]["value"]["question"] == "What is conditional probability?"
+    assert (
+        examples["answerable"]["value"]["question"]
+        == "How does a policy deductible affect claim payments?"
+    )
     response_example = query_operation["responses"]["200"]["content"]["application/json"]["example"]
     assert response_example["status"] == "answered"
-    assert response_example["citations"][0]["document_name"] == "probability.pdf"
+    assert response_example["citations"][0]["document_name"] == "loss_data_analytics_2nd_ed.pdf"
     assert {"200", "422", "502", "503"} <= set(query_operation["responses"])
 
 

@@ -19,9 +19,9 @@ LAST_RESPONSE_STATE_KEY = "last_response"
 LAST_ERROR_STATE_KEY = "last_error"
 
 SAMPLE_QUESTIONS = (
-    "What is conditional probability?",
-    "What is maximum likelihood estimation?",
-    "How does the document define a probability space?",
+    "What is the difference between claim frequency and claim severity?",
+    "How does a policy deductible affect claim payments?",
+    "Why is the normal distribution often inappropriate for insurance loss data?",
 )
 
 
@@ -221,7 +221,7 @@ def main() -> None:
     with st.form("question_form"):
         question = st.text_area(
             "Question",
-            placeholder="What is conditional probability?",
+            placeholder="How do deductibles affect claim severity and claim frequency?",
             height=120,
             key=QUESTION_STATE_KEY,
         )

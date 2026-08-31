@@ -115,12 +115,12 @@ shows `API ready`, submit a question. An answered response displays trusted sour
 cards; a question unsupported by the corpus displays an explicit abstention. The most
 recent response or recoverable error remains visible across ordinary Streamlit reruns.
 
-Known questions for the current probability and statistics corpus include:
+Known questions for the current loss data analytics corpus include:
 
-- `What is conditional probability?`
-- `What is maximum likelihood estimation?`
-- `How does the document define a probability space?`
-- `How do conditional probability and the law of total probability relate in the rain and lateness example?`
+- `What is the difference between claim frequency and claim severity?`
+- `How does a policy deductible affect claim payments?`
+- `Why is the normal distribution often inappropriate for insurance loss data?`
+- `How do deductibles affect both claim severity and claim frequency?`
 
 An unanswerable control question is:
 
@@ -144,7 +144,7 @@ Submit a query directly:
 curl -X POST http://127.0.0.1:8000/v1/query \
   -H "Content-Type: application/json" \
   -H "X-Request-ID: local-demo" \
-  -d '{"question": "What is conditional probability?", "top_k": 5}'
+  -d '{"question": "How does a policy deductible affect claim payments?", "top_k": 5}'
 ```
 
 Every HTTP response includes `X-Request-ID`. Request logs include the same identifier,
@@ -164,7 +164,7 @@ Versioned JSON reports are written under `data/evaluation/reports/`.
 Inspect retrieval independently of generation:
 
 ```bash
-uv run python scripts/retrieve.py "What is conditional probability?" --top-k 5
+uv run python scripts/retrieve.py "What is loss data analytics?" --top-k 5
 ```
 
 ## Verification
