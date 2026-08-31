@@ -128,6 +128,54 @@ An unanswerable control question is:
 
 Expected behavior is `insufficient_context` with no citations.
 
+## Docker
+
+The image includes the fixed-corpus FAISS index, SQLite metadata database, and manifest.
+Docker never runs ingestion automatically. Rebuild the artifacts before rebuilding the
+image only when the corpus or indexing configuration changes:
+
+```bash
+uv run python scripts/ingest.py
+```
+
+Create `.env` from `.env.example` and set valid Hugging Face values:
+
+```text
+CONTEXTHUB_HUGGINGFACE_MODEL=your-provider-model
+CONTEXTHUB_HUGGINGFACE_API_TOKEN=your-token
+```
+
+Build and start the FastAPI and Streamlit services:
+
+```bash
+docker compose up --build
+```
+
+Open <http://127.0.0.1:8501>. FastAPI remains available at
+<http://127.0.0.1:8000>, including its `/health`, `/ready`, and `/docs` routes.
+If either host port is already occupied, override it while leaving the container ports
+unchanged:
+
+```bash
+CONTEXTHUB_API_PORT=8001 CONTEXTHUB_UI_PORT=8502 docker compose up --build
+```
+
+Compose starts two containers from the same image. The `api` service reads the bundled
+index from `/app/data/index` and starts Uvicorn. The non-root runtime user cannot modify
+the root-owned index artifacts. The `ui` service starts Streamlit and reaches FastAPI
+over the private Compose network at `http://api:8000`. A named volume preserves the
+downloaded embedding model between container recreations.
+
+Stop the application with:
+
+```bash
+docker compose down
+```
+
+The raw PDF, local `.env`, virtual environments, tests, and development caches are
+excluded from the image. The bundled index is derived from the attributed CC BY 4.0
+demonstration corpus. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
 ## API
 
 With FastAPI running:

@@ -15,6 +15,9 @@ build/
 *.egg-info/
 data/index/*
 !data/index/.gitkeep
+!data/index/faiss.index
+!data/index/metadata.db
+!data/index/manifest.json
 data/pdfs/*
 !data/pdfs/.gitkeep
 !data/pdfs/sample.pdf
