@@ -1,0 +1,76 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: contexthub-production
+  cancel-in-progress: false
+
+env:
+  PROJECT_ID: contexthub-rag-app
+  PROJECT_NUMBER: "825051407585"
+  REGION: us-central1
+  REPOSITORY: contexthub
+  SERVICE: contexthub
+  IMAGE_NAME: contexthub
+  HUGGINGFACE_MODEL: openai/gpt-oss-20b:fastest
+  WORKLOAD_IDENTITY_PROVIDER: projects/825051407585/locations/global/workloadIdentityPools/github-actions/providers/contexthub-main
+  DEPLOYER_SERVICE_ACCOUNT: contexthub-deployer@contexthub-rag-app.iam.gserviceaccount.com
+
+jobs:
+  deploy:
+    name: Build, publish, and deploy
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.DEPLOYER_SERVICE_ACCOUNT }}
+
+      - name: Set up Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+
+      - name: Build deployment image
+        env:
+          IMAGE_URL: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+        run: docker build --platform linux/amd64 --tag "${IMAGE_URL}" .
+
+      - name: Push deployment image
+        env:
+          IMAGE_URL: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+        run: docker push "${IMAGE_URL}"
+
+      - name: Render Cloud Run manifest
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: python scripts/render_cloud_run_service.py
+
+      - name: Deploy Cloud Run revision
+        run: >-
+          gcloud run services replace deploy/cloud-run-service.yaml
+          --project="${PROJECT_ID}"
+          --region="${REGION}"
+          --quiet
+
+      - name: Show deployed revision
+        run: >-
+          gcloud run services describe "${SERVICE}"
+          --project="${PROJECT_ID}"
+          --region="${REGION}"
+          --format="table(status.latestReadyRevisionName,status.url)"

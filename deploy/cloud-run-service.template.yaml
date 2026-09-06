@@ -2,14 +2,20 @@ apiVersion: serving.knative.dev/v1
 kind: Service
 metadata:
   name: contexthub
+  annotations:
+    run.googleapis.com/iap-enabled: "true"
+    run.googleapis.com/ingress: all
 spec:
   template:
     metadata:
       annotations:
         autoscaling.knative.dev/maxScale: "1"
+        autoscaling.knative.dev/minScale: "0"
         run.googleapis.com/container-dependencies: '{"frontend":["api"]}'
+        run.googleapis.com/cpu-throttling: "true"
         run.googleapis.com/execution-environment: gen2
         run.googleapis.com/secrets: contexthub-hf-token:projects/${PROJECT_NUMBER}/secrets/contexthub-huggingface-api-token
+        run.googleapis.com/sessionAffinity: "false"
         run.googleapis.com/startup-cpu-boost: "true"
     spec:
       containerConcurrency: 10

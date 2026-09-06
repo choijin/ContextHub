@@ -227,6 +227,20 @@ uv run pytest
 The automated tests use deterministic fakes and require neither internet access
 nor production credentials.
 
+## Deployment
+
+GitHub Actions separates verification from deployment:
+
+- `CI` runs automatically for pull requests and pushes to `main`. It checks code,
+  runs tests, and verifies that the Docker image builds.
+- `Deploy` runs only when manually started from the Actions tab on `main`. It uses
+  short-lived Google Workload Identity credentials, builds an image tagged with
+  the commit SHA, pushes it to Artifact Registry, and deploys a new private Cloud
+  Run revision from `deploy/cloud-run-service.template.yaml`.
+
+The CI image is temporary and is never published. Start `Deploy` only after CI is
+green for the commit being released.
+
 ## Repository Guide
 
 ```text
