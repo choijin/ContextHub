@@ -2,13 +2,16 @@
 
 FROM python:3.12-slim AS runtime
 
+ARG EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     PATH="/app/.venv/bin:$PATH" \
     HOME=/home/contexthub \
-    HF_HOME=/home/contexthub/.cache/huggingface
+    HF_HOME=/home/contexthub/.cache/huggingface \
+    CONTEXTHUB_EMBEDDING_MODEL=${EMBEDDING_MODEL}
 
 RUN python -m pip install --no-cache-dir uv==0.11.7
 
@@ -19,6 +22,12 @@ WORKDIR /app
 
 COPY pyproject.toml uv.lock README.md ./
 RUN uv sync --frozen --no-dev --no-install-project
+
+# Retrieval must not depend on downloading the embedding model during a cold start.
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('${EMBEDDING_MODEL}', device='cpu')"
+
+ENV HF_HUB_OFFLINE=1 \
+    TRANSFORMERS_OFFLINE=1
 
 COPY src ./src
 RUN uv sync --frozen --no-dev --no-editable
