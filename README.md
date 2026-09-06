@@ -1,99 +1,129 @@
 # ContextHub
 
-ContextHub is a production-oriented retrieval-augmented generation (RAG) reference
-application. It indexes a fixed PDF corpus offline, retrieves relevant passages with
-sentence-transformer embeddings and FAISS, generates a grounded answer through a
-Hugging Face model, and returns citations backed by trusted SQLite metadata.
+ContextHub is a retrieval-augmented generation (RAG) application for asking
+questions about a fixed PDF corpus. It retrieves relevant passages with
+sentence-transformer embeddings and FAISS, asks a hosted Hugging Face model to
+answer from that context, and returns citations backed by SQLite metadata.
 
-The browser experience is a thin Streamlit client. Retrieval, prompt construction,
-generation, guardrails, and citation validation remain in the FastAPI backend.
+## Demo Availability
 
-## Architecture
+The hosted Cloud Run demonstration is access-restricted and is kept unavailable
+to the public outside scheduled demonstrations to limit cloud and LLM usage.
+
+**Recorded demonstration:** link coming soon.
+
+The complete application remains available to run locally with Docker or Python.
+
+## How It Works
 
 ```text
-Offline build
+OFFLINE INDEX BUILD
 
-data/pdfs/ -> PyMuPDF -> page-aware chunks -> sentence-transformers
-            -> FAISS vectors + SQLite metadata + manifest
+PDF files
+   |
+   v
+PyMuPDF text extraction
+   |
+   v
+Page-aware chunks
+   |
+   +--> SentenceTransformer embeddings --> FAISS vector index
+   |
+   +-------------------------------------> SQLite source metadata
 
-Runtime query
 
-Browser -> Streamlit -> POST /v1/query -> FastAPI QueryService
-                                      -> query embedding
-                                      -> FAISS retrieval
-                                      -> SQLite source metadata
-                                      -> grounded prompt
-                                      -> Hugging Face LLM
-                                      -> validated answer + citations
+RUNTIME QUERY
+
+Browser
+   |
+   v
+Streamlit UI
+   |
+   | POST /v1/query
+   v
+FastAPI
+   |
+   +--> Guard query
+   +--> Embed question
+   +--> Retrieve relevant chunks from FAISS
+   +--> Load trusted source metadata from SQLite
+   +--> Build a grounded prompt
+   +--> Generate a structured answer with Hugging Face
+   +--> Validate citations and sensitive output
+   |
+   v
+Answer with document and page citations
 ```
 
-The runtime index is read-only. Users cannot upload, replace, or delete documents.
+The browser communicates only with Streamlit. Streamlit calls FastAPI, while
+FastAPI owns retrieval, prompt construction, guardrails, generation, and citation
+validation. The runtime corpus is read-only; users cannot upload or modify PDFs.
 
-## Prerequisites
+## Try It Locally
 
-- Python 3.12
-- [`uv`](https://docs.astral.sh/uv/)
-- a Hugging Face token allowed to use Inference Providers
-- a compatible hosted model name
-
-Install the locked project dependencies:
-
-```bash
-uv sync
-```
-
-Create local configuration:
+You need a Hugging Face token with permission to use Inference Providers. Copy the
+example configuration and replace the two placeholder values:
 
 ```bash
 cp .env.example .env
 ```
 
-Set these values in `.env`:
-
 ```dotenv
-CONTEXTHUB_HUGGINGFACE_MODEL=your-provider-model
-CONTEXTHUB_HUGGINGFACE_API_TOKEN=your-token
+CONTEXTHUB_HUGGINGFACE_MODEL=openai/gpt-oss-20b:fastest
+CONTEXTHUB_HUGGINGFACE_API_TOKEN=hf_your_token
 ```
 
 Never commit `.env` or a real provider token.
 
-## Build The Index
+### Option 1: Docker
 
-Place the fixed corpus PDFs under `data/pdfs/`, then run:
+This is the simplest way to run the complete application. The image includes the
+built FAISS index, SQLite database, manifest, and embedding model.
 
 ```bash
-uv run python scripts/ingest.py
+docker compose up --build
 ```
 
-The reproducible build writes:
+Open <http://127.0.0.1:8501>. Stop everything with:
+
+```bash
+docker compose down
+```
+
+Docker Compose runs two containers from the same image:
 
 ```text
-data/index/
-├── faiss.index
-├── manifest.json
-└── metadata.db
+Browser --> localhost:8501 --> Streamlit container
+                                  |
+                                  | http://api:8000
+                                  v
+                              FastAPI container
+
+Host localhost:8000 ----------> FastAPI container (API/docs access)
 ```
 
-Indexing is an offline maintainer operation. It is not performed when the API starts.
-
-## Start The Application
-
-Start FastAPI and Streamlit together with one command:
+If either host port is occupied:
 
 ```bash
+CONTEXTHUB_API_PORT=8001 CONTEXTHUB_UI_PORT=8502 docker compose up --build
+```
+
+Then open <http://127.0.0.1:8502>.
+
+### Option 2: Python
+
+Use this path for development, debugging, evaluation, or rebuilding the index.
+Python 3.12 and [`uv`](https://docs.astral.sh/uv/) are required.
+
+```bash
+uv sync
 uv run python scripts/run_local.py
 ```
 
-Open <http://127.0.0.1:8501>. The launcher waits for FastAPI health before starting
-Streamlit and stops both processes when you press `Ctrl+C`.
+Open <http://127.0.0.1:8501>. The launcher starts FastAPI first, waits for
+readiness, starts Streamlit, and stops both when you press `Ctrl+C`.
 
-Ports can be changed without editing code:
-
-```bash
-uv run python scripts/run_local.py --api-port 8100 --ui-port 8601
-```
-
-For development with backend auto-reload, use separate terminals:
+For backend auto-reload, run the processes in separate terminals:
 
 ```bash
 uv run uvicorn contexthub.main:app --reload
@@ -104,91 +134,62 @@ CONTEXTHUB_API_BASE_URL=http://127.0.0.1:8000 \
   uv run streamlit run frontend/streamlit_app.py
 ```
 
-`CONTEXTHUB_API_BASE_URL` controls the FastAPI address used by Streamlit in local and
-deployed environments. Streamlit performs server-side HTTP requests, and the current
-same-origin-oriented design does not enable browser CORS.
+## Example Questions
 
-## Demonstration
-
-The sidebar reports whether the API and its runtime dependencies are ready. Once it
-shows `API ready`, submit a question. An answered response displays trusted source
-cards; a question unsupported by the corpus displays an explicit abstention. The most
-recent response or recoverable error remains visible across ordinary Streamlit reruns.
-
-Known questions for the current loss data analytics corpus include:
+Questions supported by the current loss data analytics corpus include:
 
 - `What is the difference between claim frequency and claim severity?`
 - `How does a policy deductible affect claim payments?`
 - `Why is the normal distribution often inappropriate for insurance loss data?`
 - `How do deductibles affect both claim severity and claim frequency?`
 
-An unanswerable control question is:
+Try `What is the capital of South Korea?` to verify that the application refuses
+questions unsupported by the corpus. The expected status is
+`insufficient_context`, with no citations.
 
-- `What is the capital of South Korea?`
+## Build A New Index
 
-Expected behavior is `insufficient_context` with no citations.
+The committed index is ready to query. Rebuild it only when changing the PDF
+corpus or indexing configuration.
 
-## Docker
-
-The image includes the fixed-corpus FAISS index, SQLite metadata database, and manifest.
-Docker never runs ingestion automatically. Rebuild the artifacts before rebuilding the
-image only when the corpus or indexing configuration changes:
+1. Place one or more PDFs in `data/pdfs/`.
+2. Run the offline ingestion command:
 
 ```bash
 uv run python scripts/ingest.py
 ```
 
-Create `.env` from `.env.example` and set valid Hugging Face values:
+3. Inspect retrieval without calling the LLM:
+
+```bash
+uv run python scripts/retrieve.py "A question about the new corpus" --top-k 5
+```
+
+Ingestion atomically replaces these generated artifacts:
 
 ```text
-CONTEXTHUB_HUGGINGFACE_MODEL=your-provider-model
-CONTEXTHUB_HUGGINGFACE_API_TOKEN=your-token
+data/index/
+|-- faiss.index    # chunk embedding vectors
+|-- metadata.db    # documents, chunks, pages, and FAISS positions
+`-- manifest.json  # model, dimensions, checksums, and build information
 ```
 
-Build and start the FastAPI and Streamlit services:
+After rebuilding the index, rebuild the Docker image so the new artifacts are
+included:
 
 ```bash
-docker compose up --build
+docker compose build
 ```
 
-Open <http://127.0.0.1:8501>. FastAPI remains available at
-<http://127.0.0.1:8000>, including its `/health`, `/ready`, and `/docs` routes.
-If either host port is already occupied, override it while leaving the container ports
-unchanged:
-
-```bash
-CONTEXTHUB_API_PORT=8001 CONTEXTHUB_UI_PORT=8502 docker compose up --build
-```
-
-Compose starts two containers from the same image. The `api` service reads the bundled
-index from `/app/data/index` and starts Uvicorn. The non-root runtime user cannot modify
-the root-owned index artifacts. The `ui` service starts Streamlit and reaches FastAPI
-over the private Compose network at `http://api:8000`. A named volume preserves the
-downloaded embedding model between container recreations.
-
-Stop the application with:
-
-```bash
-docker compose down
-```
-
-The raw PDF, local `.env`, virtual environments, tests, and development caches are
-excluded from the image.
-
-The bundled index is derived from *Loss Data Analytics, Second Edition*, Version 2.0
-(October 2024), edited by Hélène Cossette, Edward (Jed) Frees, Brian Hartman, and Tim
-Higgins. The source is <https://openacttexts.github.io/LDAVer2/> and is licensed under
-[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). ContextHub transforms the
-work by extracting, chunking, embedding, and indexing its text; the original editors
-do not endorse this application.
+Indexing is an offline maintainer operation and never runs automatically when the
+API starts.
 
 ## API
 
-With FastAPI running:
+With the application running locally:
 
+- Streamlit: <http://127.0.0.1:8501>
 - OpenAPI UI: <http://127.0.0.1:8000/docs>
-- ReDoc: <http://127.0.0.1:8000/redoc>
-- OpenAPI schema: <http://127.0.0.1:8000/openapi.json>
 - Process health: <http://127.0.0.1:8000/health>
 - Runtime readiness: <http://127.0.0.1:8000/ready>
 
@@ -198,32 +199,23 @@ Submit a query directly:
 curl -X POST http://127.0.0.1:8000/v1/query \
   -H "Content-Type: application/json" \
   -H "X-Request-ID: local-demo" \
-  -d '{"question": "How does a policy deductible affect claim payments?", "top_k": 5}'
+  -d '{"question":"How does a policy deductible affect claim payments?","top_k":5}'
 ```
 
-Every HTTP response includes `X-Request-ID`. Request logs include the same identifier,
-method, path, status code, and duration so one request can be traced without logging
-questions, prompts, documents, credentials, or complete model responses.
+Every response includes an `X-Request-ID` that can be matched with application
+logs. `/health` checks whether the process is alive; `/ready` verifies that the
+index, embedding provider, metadata database, retriever, and LLM configuration
+are usable.
 
-## Retrieval Evaluation
+## Evaluation And Tests
 
-Run the offline retrieval evaluation without calling an LLM:
+Run retrieval evaluation without calling the hosted LLM:
 
 ```bash
 uv run python scripts/evaluate.py
 ```
 
-Versioned JSON reports are written under `data/evaluation/reports/`.
-
-Inspect retrieval independently of generation:
-
-```bash
-uv run python scripts/retrieve.py "What is loss data analytics?" --top-k 5
-```
-
-## Verification
-
-Run all local quality gates:
+Run all local quality checks:
 
 ```bash
 uv run ruff check .
@@ -232,27 +224,48 @@ uv run mypy src
 uv run pytest
 ```
 
-Tests use deterministic fakes and do not require Hugging Face credentials or internet
-access.
+The automated tests use deterministic fakes and require neither internet access
+nor production credentials.
 
-## Troubleshooting
+## Repository Guide
 
-`/health` returns `200` when the FastAPI process is alive. `/ready` returns `200` only
-when the manifest, embedding model, FAISS index, SQLite mappings, retrieval service,
-and LLM configuration are ready.
-
-If Streamlit reports that the API is unavailable, confirm the configured base URL and
-check:
-
-```bash
-curl http://127.0.0.1:8000/health
-curl http://127.0.0.1:8000/ready
+```text
+frontend/              Streamlit client
+src/contexthub/
+|-- api/               FastAPI routes and HTTP behavior
+|-- application/       retrieval, query, evaluation, and safety workflows
+|-- domain/            provider-independent models and errors
+|-- infrastructure/    FAISS, SQLite, PDF, embedding, and LLM adapters
+`-- config/            environment-based application settings
+scripts/               ingestion, retrieval, evaluation, and local startup tools
+data/index/            versioned runtime index artifacts
+deploy/                Cloud Run deployment template
+docs/                  architecture, design, data model, and implementation plan
+tests/                 unit, integration, API, and end-to-end tests
 ```
 
-If readiness fails, inspect its `checks` array. It identifies whether the problem is
-the index, embedding compatibility, metadata mapping, or LLM configuration.
+## Documentation
 
-## Project Status
+- [Project overview](docs/00_Project_Overview.md)
+- [System architecture](docs/01_System_Architecture.md)
+- [Data model](docs/02_Data_Model.md)
+- [Technical design](docs/03_Technical_Design.md)
+- [Implementation plan](docs/04_Implementation_Plan.md)
 
-Phases 1 through 7 and the Docker portion of Phase 8 are implemented. GitHub Actions
-and public deployment remain Phase 8 work.
+The README contains the normal user and contributor workflows. The documents
+under `docs/` hold the deeper design rationale and implementation contracts.
+
+## Corpus Attribution
+
+The bundled index is derived from *Loss Data Analytics, Second Edition*, Version
+2.0 (October 2024), edited by Helene Cossette, Edward (Jed) Frees, Brian Hartman,
+and Tim Higgins. The source is <https://openacttexts.github.io/LDAVer2/> and is
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+ContextHub transforms the work by extracting, chunking, embedding, and indexing
+its text; the original editors do not endorse this application.
+
+## Status
+
+The local RAG workflow, evaluation suite, Streamlit client, Docker packaging,
+continuous integration, and private Cloud Run deployment are implemented. Public
+hosting is intentionally disabled outside demonstrations.
