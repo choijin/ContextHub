@@ -31,6 +31,12 @@ jobs:
           enable-cache: true
           cache-dependency-glob: uv.lock
 
+      - name: Set up OpenTofu
+        uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        with:
+          tofu_version: "1.12.6"
+          tofu_wrapper: false
+
       - name: Install locked dependencies
         run: uv sync --frozen
 
@@ -45,6 +51,14 @@ jobs:
 
       - name: Run tests
         run: uv run pytest
+
+      - name: Check OpenTofu formatting
+        run: tofu -chdir=terraform fmt -check
+
+      - name: Validate OpenTofu configuration
+        run: |
+          tofu -chdir=terraform init -backend=false -input=false
+          tofu -chdir=terraform validate
 
       - name: Build Docker image
         run: docker build --tag contexthub:ci .

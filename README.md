@@ -235,8 +235,8 @@ GitHub Actions separates verification from deployment:
   runs tests, and verifies that the Docker image builds.
 - `Deploy` runs only when manually started from the Actions tab on `main`. It uses
   short-lived Google Workload Identity credentials, builds an image tagged with
-  the commit SHA, pushes it to Artifact Registry, and deploys a new private Cloud
-  Run revision from `deploy/cloud-run-service.template.yaml`.
+  the commit SHA, pushes it to Artifact Registry, previews the OpenTofu plan, and
+  applies the private Cloud Run service defined in `terraform/`.
 
 The CI image is temporary and is never published. Start `Deploy` only after CI is
 green for the commit being released.
@@ -253,7 +253,7 @@ src/contexthub/
 `-- config/            environment-based application settings
 scripts/               ingestion, retrieval, evaluation, and local startup tools
 data/index/            versioned runtime index artifacts
-deploy/                Cloud Run deployment template
+terraform/              Cloud Run infrastructure and shared-state configuration
 docs/                  architecture, design, data model, and implementation plan
 tests/                 unit, integration, API, and end-to-end tests
 ```
