@@ -253,7 +253,7 @@ src/contexthub/
 `-- config/            environment-based application settings
 scripts/               ingestion, retrieval, evaluation, and local startup tools
 data/index/            versioned runtime index artifacts
-terraform/              Cloud Run infrastructure and shared-state configuration
+terraform/             Cloud Run infrastructure and shared-state configuration
 docs/                  architecture, design, data model, and implementation plan
 tests/                 unit, integration, API, and end-to-end tests
 ```
