@@ -215,6 +215,13 @@ Run retrieval evaluation without calling the hosted LLM:
 uv run python scripts/evaluate.py
 ```
 
+The generated report measures Hit Rate@K (whether at least one expected chunk
+was retrieved), Recall@K (the proportion of expected chunks retrieved), Mean
+Reciprocal Rank (how highly the first expected chunk ranked), and average
+retrieval latency. Together, these metrics describe retrieval coverage, ranking
+quality, and response speed without allowing answer generation to obscure
+retrieval performance.
+
 Run all local quality checks:
 
 ```bash
@@ -239,7 +246,23 @@ GitHub Actions separates verification from deployment:
   applies the private Cloud Run service defined in `terraform/`.
 
 The CI image is temporary and is never published. Start `Deploy` only after CI is
-green for the commit being released.
+green for the commit being released. The image built in the Deploy stage is then
+pushed to Artifact Registry.
+
+Google Cloud was selected to broaden my cloud experience beyond AWS, and the
+available $300 trial credit made it practical to build and test a real
+deployment. The architecture translates familiar AWS concepts into Google
+Cloud services through Cloud Run, Artifact Registry, Secret Manager, Workload
+Identity Federation, Cloud Logging, and GCS-backed OpenTofu state.
+
+| Google Cloud | AWS Equivalent |
+|---|---|
+| Cloud Run | ECS Fargate / App Runner |
+| Artifact Registry | ECR |
+| Secret Manager | Secrets Manager |
+| GCS | S3 |
+| Workload Identity Federation | IAM OIDC federation |
+| Cloud Logging | CloudWatch Logs |
 
 ## Repository Guide
 
@@ -284,3 +307,17 @@ its text; the original editors do not endorse this application.
 The local RAG workflow, evaluation suite, Streamlit client, Docker packaging,
 continuous integration, and private Cloud Run deployment are implemented. Public
 hosting is intentionally disabled outside demonstrations.
+
+## Future Work
+
+- **Hybrid retrieval and reranking:** Combine semantic FAISS search with BM25
+  keyword retrieval so the candidate set captures both conceptual similarity and
+  exact terminology. A cross-encoder would then evaluate each question and
+  candidate chunk together, rerank the merged results, and send only the most
+  relevant context to the LLM.
+- **Broader OpenTofu ownership:** Bring supporting Google Cloud resources such as
+  Artifact Registry, Secret Manager, service accounts, IAM bindings, and
+  Workload Identity Federation under version-controlled infrastructure code.
+- **Split private API and public frontend:** Deploy Streamlit and FastAPI as
+  separate Cloud Run services so the frontend can accept public traffic while
+  the API remains **private** and authorizes only service-to-service requests.
