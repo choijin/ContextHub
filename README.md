@@ -245,18 +245,18 @@ green for the commit being released.
 
 ```text
 ContextHub/
-|-- data/index/             Versioned runtime index artifacts
-|-- docs/                   Architecture, design, data model, and implementation plan
-|-- frontend/               Streamlit client
-|-- scripts/                Ingestion, retrieval, evaluation, and local startup tools
-|-- src/contexthub/
-|   |-- api/                FastAPI routes and HTTP behavior
-|   |-- application/        Retrieval, query, evaluation, and safety workflows
-|   |-- config/             Environment-based application settings
-|   |-- domain/             Provider-independent models and errors
-|   `-- infrastructure/     FAISS, SQLite, PDF, embedding, and LLM adapters
-|-- terraform/              Cloud Run infrastructure and shared-state configuration
-`-- tests/                  Unit, integration, API, and end-to-end tests
+├── data/index/             Versioned runtime index artifacts
+├── docs/                   Architecture, design, data model, and implementation plan
+├── frontend/               Streamlit client
+├── scripts/                Ingestion, retrieval, evaluation, and local startup tools
+├── src/contexthub/
+│   ├── api/                FastAPI routes and HTTP behavior
+│   ├── application/        Retrieval, query, evaluation, and safety workflows
+│   ├── config/             Environment-based application settings
+│   ├── domain/             Provider-independent models and errors
+│   └── infrastructure/     FAISS, SQLite, PDF, embedding, and LLM adapters
+├── terraform/              Cloud Run infrastructure and shared-state configuration
+└── tests/                  Unit, integration, API, and end-to-end tests
 ```
 
 ## Documentation
