@@ -7,12 +7,26 @@ answer from that context, and returns citations backed by SQLite metadata.
 
 ## Demo Availability
 
-The hosted Cloud Run demonstration is access-restricted and is kept unavailable
-to the public outside scheduled demonstrations to limit cloud and LLM usage.
-
-**Recorded demonstration:** link coming soon.
+The application was deployed successfully to Google Cloud Run for testing and
+demonstration. The live website is currently offline to avoid ongoing cloud
+maintenance and hosted LLM usage costs.
 
 The complete application remains available to run locally with Docker or Python.
+
+## Demo Walkthrough
+
+Submit a question about the indexed loss data analytics corpus:
+
+![ContextHub question form](docs/images/question.png)
+
+ContextHub returns a grounded answer and the document passages used as sources:
+
+![ContextHub grounded answer with source citations](docs/images/answer.png)
+
+When the corpus does not support a question, the application refuses to answer
+instead of relying on the LLM's general knowledge:
+
+![ContextHub insufficient-context response](docs/images/unsupported-question.png)
 
 ## How It Works
 
