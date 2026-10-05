@@ -137,24 +137,12 @@ class QueryService:
                 answer=SENSITIVE_DATA_REFUSAL,
             )
 
-        citation_ids = self._source_indices_to_chunk_ids(
+        citations = self._citation_builder.resolve(
             llm_answer.cited_source_indices,
-            prompt,
+            prompt.context,
             retrieval_result,
+            logger=self._logger,
         )
-        if not citation_ids:
-            citation_ids = self._prompt_context_chunk_ids(prompt, retrieval_result)
-            self._logger.info(
-                "query_citations_fell_back_to_prompt_context",
-                extra={
-                    "extra_fields": {
-                        "request_id": str(retrieval_result.request_id),
-                        "citation_count": len(citation_ids),
-                    }
-                },
-            )
-
-        citations = self._citation_builder.build(citation_ids, retrieval_result.chunks)
         if not citations:
             self._log_completed(retrieval_result, AnswerStatus.INSUFFICIENT_CONTEXT, stopwatch)
             return Answer(
@@ -209,68 +197,6 @@ class QueryService:
             raise LLMProviderResponseError(
                 "LLM provider returned invalid structured output."
             ) from exc
-
-    def _source_indices_to_chunk_ids(
-        self,
-        cited_source_indices: list[int],
-        prompt: PromptRequest,
-        retrieval_result: RetrievalResult,
-    ) -> list[str]:
-        prompt_context_by_index = {context.source_index: context for context in prompt.context}
-        retrieved_chunk_ids = {retrieved.chunk.id for retrieved in retrieval_result.chunks}
-        chunk_ids: list[str] = []
-        seen: set[int] = set()
-        ignored_source_indices: list[int] = []
-        for source_index in cited_source_indices:
-            if source_index in seen:
-                continue
-            context = prompt_context_by_index.get(source_index)
-            if context is None:
-                ignored_source_indices.append(source_index)
-                seen.add(source_index)
-                continue
-            seen.add(source_index)
-            if context.chunk_id not in retrieved_chunk_ids:
-                ignored_source_indices.append(source_index)
-                continue
-            chunk_ids.append(context.chunk_id)
-
-        if ignored_source_indices:
-            self._logger.warning(
-                "llm_citation_indices_ignored",
-                extra={
-                    "extra_fields": {
-                        "request_id": str(retrieval_result.request_id),
-                        "returned_source_indices": cited_source_indices,
-                        "valid_source_indices": [
-                            source_index
-                            for source_index, context in prompt_context_by_index.items()
-                            if context.chunk_id in chunk_ids
-                        ],
-                        "ignored_source_indices": ignored_source_indices,
-                        "allowed_source_indices": sorted(prompt_context_by_index),
-                    }
-                },
-            )
-        return chunk_ids
-
-    @staticmethod
-    def _prompt_context_chunk_ids(
-        prompt: PromptRequest,
-        retrieval_result: RetrievalResult,
-    ) -> list[str]:
-        retrieved_chunk_ids = {retrieved.chunk.id for retrieved in retrieval_result.chunks}
-        chunk_ids: list[str] = []
-        seen: set[str] = set()
-        for context in sorted(
-            prompt.context,
-            key=lambda prompt_context: prompt_context.source_index,
-        ):
-            if context.chunk_id in seen or context.chunk_id not in retrieved_chunk_ids:
-                continue
-            seen.add(context.chunk_id)
-            chunk_ids.append(context.chunk_id)
-        return chunk_ids
 
     @staticmethod
     def _log_invalid_generation(generated_text: str, logger: logging.Logger) -> None:

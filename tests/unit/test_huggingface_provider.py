@@ -1,3 +1,4 @@
+import json
 from collections.abc import Callable
 
 import httpx
@@ -21,6 +22,8 @@ def test_huggingface_provider_returns_generation_result() -> None:
         nonlocal request_count
         request_count += 1
         payload = request.read().decode()
+        messages = json.loads(payload)["messages"]
+        assert messages[1]["content"] == _prompt().user_message
         assert request.headers["authorization"] == "Bearer token"
         assert str(request.url) == "https://router.huggingface.co/v1/chat/completions"
         assert '"model":"model"' in payload
@@ -115,6 +118,7 @@ def _prompt() -> PromptRequest:
     return PromptRequest(
         system_prompt="system",
         question="question",
+        user_message="Prepared question and context: chunk-a",
         context=[
             PromptContext(
                 source_index=1,

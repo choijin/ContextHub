@@ -37,9 +37,10 @@ class PromptContext(BaseModel):
 class PromptRequest(BaseModel):
     system_prompt: str
     question: str
+    user_message: str
     context: list[PromptContext] = Field(default_factory=list)
 
-    @field_validator("system_prompt", "question")
+    @field_validator("system_prompt", "question", "user_message")
     @classmethod
     def validate_non_blank(cls, value: str) -> str:
         if not value.strip():

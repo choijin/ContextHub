@@ -156,27 +156,5 @@ class HuggingFaceLLMProvider:
     def _render_messages(prompt: PromptRequest) -> list[dict[str, str]]:
         return [
             {"role": "system", "content": prompt.system_prompt},
-            {"role": "user", "content": HuggingFaceLLMProvider._render_user_message(prompt)},
+            {"role": "user", "content": prompt.user_message},
         ]
-
-    @staticmethod
-    def _render_user_message(prompt: PromptRequest) -> str:
-        context_blocks = [
-            (
-                "<CONTEXT_BLOCK>\n"
-                f"source_index: {context.source_index}\n"
-                f"chunk_id: {context.chunk_id}\n"
-                f"document: {context.document_name}\n"
-                f"pages: {context.page_start}-{context.page_end}\n"
-                "text:\n"
-                f"{context.text}\n"
-                "</CONTEXT_BLOCK>"
-            )
-            for context in prompt.context
-        ]
-        context_text = "\n\n".join(context_blocks) if context_blocks else "No context provided."
-        return (
-            f"Question:\n{prompt.question}\n\n"
-            f"Context:\n{context_text}\n\n"
-            "Return only the required JSON object."
-        )

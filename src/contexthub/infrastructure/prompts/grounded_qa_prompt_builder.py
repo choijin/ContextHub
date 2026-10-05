@@ -46,9 +46,21 @@ class GroundedQAPromptBuilder:
 
     def build(self, question: str, chunks: list[RetrievedChunk]) -> PromptRequest:
         selected = self._select_chunks(chunks)
+        context_text = (
+            "\n\n".join(
+                self._format_context_block(retrieved, source_index)
+                for source_index, retrieved in enumerate(selected, start=1)
+            )
+            or "No context provided."
+        )
         return PromptRequest(
             system_prompt=SYSTEM_PROMPT,
             question=question,
+            user_message=(
+                f"Question:\n{question}\n\n"
+                f"Context:\n{context_text}\n\n"
+                "Return only the required JSON object."
+            ),
             context=[
                 PromptContext(
                     source_index=source_index,
@@ -67,14 +79,12 @@ class GroundedQAPromptBuilder:
         seen: set[str] = set()
         used_characters = 0
 
-        for source_index, retrieved in enumerate(
-            sorted(chunks, key=lambda chunk: chunk.rank), start=1
-        ):
+        for retrieved in sorted(chunks, key=lambda chunk: chunk.rank):
             chunk_id = retrieved.chunk.id
             if chunk_id in seen:
                 continue
             seen.add(chunk_id)
-            text_length = len(self._format_context_block(retrieved, source_index))
+            text_length = len(self._format_context_block(retrieved, len(selected) + 1))
             would_exceed = used_characters + text_length > self._max_context_characters
             if would_exceed and selected:
                 continue

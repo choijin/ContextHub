@@ -2456,6 +2456,13 @@ tests/unit/test_retrieval_service.py
 
 ## 31.16 `src/contexthub/application/services/citation_builder.py`
 
+The citation builder also owns source-index resolution. Its `resolve` method
+maps model-selected indices through prompt context to retrieved chunks,
+deduplicates selections, ignores invalid indices, and falls back to prompt
+context when no valid selections remain. Citation metadata continues to come
+from retrieved chunks. Fallback sources identify supplied context, rather than
+independently proving answer support.
+
 Create:
 
 - `CitationBuilder`
@@ -2476,6 +2483,12 @@ tests/unit/test_citation_builder.py
 ---
 
 ## 31.17 `src/contexthub/application/services/query_service.py`
+
+Prompt formatting is owned by `GroundedQAPromptBuilder`. `PromptRequest` includes
+the final `user_message` alongside its question, system prompt, and structured
+context. The LLM adapter sends this message without reconstructing context.
+QueryService delegates citation selection and construction to
+`CitationBuilder.resolve`.
 
 Create:
 
